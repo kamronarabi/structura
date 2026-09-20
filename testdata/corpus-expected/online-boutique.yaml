@@ -1,0 +1,35 @@
+repo: online-boutique
+source: |
+  GoogleCloudPlatform/microservices-demo. Edges taken from the project's own
+  architecture diagram in docs/ and its README service table, which lists each
+  service and what it calls.
+
+edges:
+  # The frontend is the entry point and fans out to almost everything.
+  - {from: frontend, to: productcatalogservice}
+  - {from: frontend, to: cartservice}
+  - {from: frontend, to: recommendationservice}
+  - {from: frontend, to: currencyservice}
+  - {from: frontend, to: shippingservice}
+  - {from: frontend, to: checkoutservice}
+  - {from: frontend, to: adservice}
+  - {from: frontend, to: shoppingassistantservice}
+
+  # Checkout orchestrates the purchase.
+  - {from: checkoutservice, to: productcatalogservice}
+  - {from: checkoutservice, to: cartservice}
+  - {from: checkoutservice, to: currencyservice}
+  - {from: checkoutservice, to: paymentservice}
+  - {from: checkoutservice, to: shippingservice}
+  - {from: checkoutservice, to: emailservice}
+
+  - {from: recommendationservice, to: productcatalogservice}
+  - {from: cartservice, to: redis-cart}
+  - {from: loadgenerator, to: frontend}
+
+allowed:
+  # Ingress routing, correct but a deployment detail rather than app design.
+  - {from: frontend-ingress, to: frontend}
+  # The Terraform under terraform/ provisions the cluster this runs on.
+  - {from: my_cluster, to: enable_google_apis}
+  - {from: prs-gke-cluster, to: enable_google_apis}

@@ -1,0 +1,21 @@
+name: shop
+services:
+  gateway:
+    build: ../services/gateway
+    ports: ["8080:8080"]
+    environment:
+      CHECKOUT_URL: http://checkout:9090
+      REDIS_URL: redis://cache:6379
+    depends_on: [checkout, cache]
+  checkout:
+    build: ../services/checkout
+    environment:
+      DATABASE_URL: postgres://checkout:pw@orders-db:5432/orders
+      BROKER_URL: amqp://broker:5672
+    depends_on: [orders-db, broker]
+  cache:
+    image: redis:7-alpine
+  orders-db:
+    image: postgres:16
+  broker:
+    image: rabbitmq:3

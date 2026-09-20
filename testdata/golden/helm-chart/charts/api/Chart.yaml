@@ -1,0 +1,13 @@
+apiVersion: v2
+name: api
+description: The acme API service
+type: application
+version: 0.3.1
+appVersion: "1.2.0"
+dependencies:
+  - name: postgresql
+    version: 14.x.x
+    repository: https://charts.bitnami.com/bitnami
+  - name: redis
+    version: 18.x.x
+    repository: https://charts.bitnami.com/bitnami

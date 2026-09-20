@@ -1,0 +1,410 @@
+{
+  "schemaVersion": "0.1.0",
+  "generatedAt": "0001-01-01T00:00:00Z",
+  "contentHash": "sha256:db462e6914c5d5463d334b9ac8acdae1f1e4fd94cc52d094e5a9f2108ad86627",
+  "root": {
+    "name": "polyglot-monorepo"
+  },
+  "nodes": [
+    {
+      "id": "boundary:compose/shop/shop",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "shop",
+      "attrs": {
+        "orchestrator": "docker-compose"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 1
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:compose/shop/cache",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "cache",
+      "namespace": "shop",
+      "tech": {
+        "runtime": "container",
+        "framework": "redis"
+      },
+      "attrs": {
+        "image": "redis:7-alpine"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 16
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:compose/shop/orders-db",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "orders-db",
+      "namespace": "shop",
+      "tech": {
+        "runtime": "container",
+        "framework": "postgresql"
+      },
+      "attrs": {
+        "image": "postgres:16"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 18
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "queue:compose/shop/broker",
+      "kind": "queue",
+      "layer": "container",
+      "name": "broker",
+      "namespace": "shop",
+      "tech": {
+        "runtime": "container",
+        "framework": "amqp"
+      },
+      "attrs": {
+        "image": "rabbitmq:3"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 20
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "service:compose/shop/checkout",
+      "kind": "service",
+      "layer": "container",
+      "name": "checkout",
+      "namespace": "shop",
+      "tech": {
+        "language": "go",
+        "runtime": "container",
+        "framework": "grpc"
+      },
+      "attrs": {
+        "buildContext": "services/checkout",
+        "dependencyCount": 3,
+        "directory": "services/checkout",
+        "goVersion": "1.25",
+        "manifest": "go.mod",
+        "module": "github.com/acme/shop/checkout"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 10
+        },
+        {
+          "extractor": "manifest",
+          "path": "services/checkout/go.mod",
+          "line": 1
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "service:compose/shop/gateway",
+      "kind": "service",
+      "layer": "container",
+      "name": "gateway",
+      "namespace": "shop",
+      "tech": {
+        "language": "go",
+        "runtime": "container",
+        "framework": "gin"
+      },
+      "attrs": {
+        "buildContext": "services/gateway",
+        "dependencyCount": 4,
+        "directory": "services/gateway",
+        "goVersion": "1.25",
+        "manifest": "go.mod",
+        "module": "github.com/acme/shop/gateway",
+        "ports": [
+          8080
+        ]
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 3
+        },
+        {
+          "extractor": "manifest",
+          "path": "services/gateway/go.mod",
+          "line": 1
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "service:manifest/python/services/recommendations",
+      "kind": "service",
+      "layer": "container",
+      "name": "recommendations",
+      "namespace": "python",
+      "tech": {
+        "language": "python",
+        "framework": "fastapi"
+      },
+      "attrs": {
+        "dependencyCount": 5,
+        "directory": "services/recommendations",
+        "manifest": "pyproject.toml",
+        "package": "recommendations",
+        "pythonVersion": ">=3.11",
+        "usesTechnology": [
+          "kafka",
+          "postgres"
+        ],
+        "version": "0.4.0"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "services/recommendations/pyproject.toml",
+          "line": 1
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "service:manifest/typescript/web",
+      "kind": "service",
+      "layer": "container",
+      "name": "@acme/shop-web",
+      "namespace": "typescript",
+      "tech": {
+        "language": "typescript",
+        "framework": "nextjs"
+      },
+      "attrs": {
+        "dependencyCount": 4,
+        "directory": "web",
+        "manifest": "package.json",
+        "nodeVersion": ">=22",
+        "package": "@acme/shop-web",
+        "usesTechnology": [
+          "sentry",
+          "redis"
+        ],
+        "version": "3.1.0"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "web/package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.8
+    }
+  ],
+  "edges": [
+    {
+      "id": "e:c63b9d5cc243",
+      "from": "boundary:compose/shop/shop",
+      "to": "datastore:compose/shop/cache",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 16,
+          "rule": "compose_project_member",
+          "detail": "service \"cache\" is declared in Compose project \"shop\""
+        }
+      ]
+    },
+    {
+      "id": "e:845f884408f3",
+      "from": "boundary:compose/shop/shop",
+      "to": "datastore:compose/shop/orders-db",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 18,
+          "rule": "compose_project_member",
+          "detail": "service \"orders-db\" is declared in Compose project \"shop\""
+        }
+      ]
+    },
+    {
+      "id": "e:694fcbb4af2d",
+      "from": "boundary:compose/shop/shop",
+      "to": "queue:compose/shop/broker",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 20,
+          "rule": "compose_project_member",
+          "detail": "service \"broker\" is declared in Compose project \"shop\""
+        }
+      ]
+    },
+    {
+      "id": "e:65d1b2f406dd",
+      "from": "boundary:compose/shop/shop",
+      "to": "service:compose/shop/checkout",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 10,
+          "rule": "compose_project_member",
+          "detail": "service \"checkout\" is declared in Compose project \"shop\""
+        }
+      ]
+    },
+    {
+      "id": "e:98f1d129cf36",
+      "from": "boundary:compose/shop/shop",
+      "to": "service:compose/shop/gateway",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 3,
+          "rule": "compose_project_member",
+          "detail": "service \"gateway\" is declared in Compose project \"shop\""
+        }
+      ]
+    },
+    {
+      "id": "e:d35b59fc126c",
+      "from": "service:compose/shop/checkout",
+      "to": "datastore:compose/shop/orders-db",
+      "kind": "persists_to",
+      "protocol": "postgres",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 15,
+          "rule": "compose_depends_on",
+          "detail": "\"checkout\" declares depends_on \"orders-db\" (condition: service_started)"
+        },
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 12,
+          "rule": "name_exact",
+          "detail": "env DATABASE_URL=postgres://***:***@orders-db:5432/orders (resolves to orders-db)"
+        }
+      ]
+    },
+    {
+      "id": "e:37b762cee626",
+      "from": "service:compose/shop/checkout",
+      "to": "queue:compose/shop/broker",
+      "kind": "publishes_to",
+      "protocol": "amqp",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 15,
+          "rule": "compose_depends_on",
+          "detail": "\"checkout\" declares depends_on \"broker\" (condition: service_started)"
+        },
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 12,
+          "rule": "name_exact",
+          "detail": "env BROKER_URL=amqp://broker:5672 (resolves to broker)"
+        }
+      ]
+    },
+    {
+      "id": "e:64b0233d6508",
+      "from": "service:compose/shop/gateway",
+      "to": "datastore:compose/shop/cache",
+      "kind": "persists_to",
+      "protocol": "redis",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 9,
+          "rule": "compose_depends_on",
+          "detail": "\"gateway\" declares depends_on \"cache\" (condition: service_started)"
+        },
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 6,
+          "rule": "name_exact",
+          "detail": "env REDIS_URL=redis://cache:6379 (resolves to cache)"
+        }
+      ]
+    },
+    {
+      "id": "e:43025a974a7d",
+      "from": "service:compose/shop/gateway",
+      "to": "service:compose/shop/checkout",
+      "kind": "calls",
+      "protocol": "http",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 9,
+          "rule": "compose_depends_on",
+          "detail": "\"gateway\" declares depends_on \"checkout\" (condition: service_started)"
+        },
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 6,
+          "rule": "dns_exact",
+          "detail": "env CHECKOUT_URL=http://checkout:9090 (resolves to github.com/acme/shop/checkout)"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [],
+  "stats": {
+    "filesScanned": 5,
+    "filesParsed": 5,
+    "nodeCount": 8,
+    "edgeCount": 9,
+    "durationMs": 0
+  }
+}

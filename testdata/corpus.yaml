@@ -1,0 +1,58 @@
+# Tier 2 fixtures: real repositories, cloned on demand, never committed.
+#
+# The synthetic fixtures in testdata/golden are too clean to trust on their
+# own. The same person wrote the input and the expectation, so they measure
+# whether the extractors do what their author intended, not whether they cope
+# with what people actually commit.
+#
+# This corpus is the reality check. Each entry is pinned to a commit so the
+# numbers mean something across runs, and `make corpus` clones them shallowly
+# into testdata/corpus/, which is gitignored.
+#
+# The mix is deliberate: compose-only, Kubernetes-native, Helm-heavy, and
+# Terraform-heavy shapes, at a range of sizes. Helm prevalence in particular
+# is a question the plan wants answered before more is built on the decision
+# not to render charts.
+
+repos:
+  - name: sock-shop
+    url: https://github.com/microservices-demo/microservices-demo
+    ref: 9dff06fae4981921caec6a62393a6ebfce4b3e3f
+    shape: kubernetes + compose
+    note: The canonical microservices reference app.
+
+  - name: podinfo
+    url: https://github.com/stefanprodan/podinfo
+    ref: dd507173b7b75b2312a36cabe0de5f09c1ce69c8
+    shape: helm + kustomize
+    note: Small, idiomatic, heavily Helm-based.
+
+  - name: online-boutique
+    url: https://github.com/GoogleCloudPlatform/microservices-demo
+    ref: 38e7348eb289eb5b87c0c6e8cb19ced0449dc389
+    shape: kubernetes + helm + polyglot
+    note: Eleven services across Go, C#, Node, Python, Java.
+
+  - name: kubernetes-examples
+    url: https://github.com/kubernetes/examples
+    ref: d6b8cd27eacb51e651a1aa6f7c190a28713eff6e
+    shape: plain kubernetes
+    note: Wide variety of hand-written manifests.
+
+  - name: awesome-compose
+    url: https://github.com/docker/awesome-compose
+    ref: 30f4b7f6a6c3b0c0ecf4d4efb0de203c48d11562
+    shape: compose only
+    note: Around a hundred small, independent Compose stacks.
+
+  - name: terraform-aws-vpc
+    url: https://github.com/terraform-aws-modules/terraform-aws-vpc
+    ref: b3abd6df2ecf052451a361ed55b8f06f8742a795
+    shape: terraform module
+    note: Heavy use of locals, for_each, and count.
+
+  - name: bitnami-charts
+    url: https://github.com/bitnami/charts
+    ref: bd57775ec33ee9780938091f9bc12bf73a921918
+    shape: helm only
+    note: Very large. Bounded by --max-repo-files when cloned.

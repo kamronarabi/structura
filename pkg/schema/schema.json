@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://structura.dev/schema/sag-v0.1.0.json",
+  "$defs": {
+    "Attrs": {
+      "type": "object"
+    },
+    "Diagnostic": {
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": [
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ]
+    },
+    "Edge": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "calls",
+            "persists_to",
+            "publishes_to",
+            "subscribes_to",
+            "depends_on",
+            "exposes",
+            "contains"
+          ]
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "from",
+        "to",
+        "kind",
+        "confidence"
+      ]
+    },
+    "Evidence": {
+      "properties": {
+        "extractor": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        },
+        "rule": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "extractor",
+        "rule"
+      ]
+    },
+    "Node": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "service",
+            "datastore",
+            "queue",
+            "external",
+            "cloud_resource",
+            "package",
+            "boundary"
+          ]
+        },
+        "layer": {
+          "type": "string",
+          "enum": [
+            "context",
+            "container",
+            "component"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "tech": {
+          "$ref": "#/$defs/Tech"
+        },
+        "attrs": {
+          "$ref": "#/$defs/Attrs"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "type": "array"
+        },
+        "confidence": {
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "layer",
+        "name",
+        "confidence"
+      ]
+    },
+    "Root": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "vcs": {
+          "$ref": "#/$defs/VCS"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "Source": {
+      "properties": {
+        "extractor": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "extractor",
+        "path"
+      ]
+    },
+    "Stats": {
+      "properties": {
+        "filesScanned": {
+          "type": "integer"
+        },
+        "filesParsed": {
+          "type": "integer"
+        },
+        "nodeCount": {
+          "type": "integer"
+        },
+        "edgeCount": {
+          "type": "integer"
+        },
+        "durationMs": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "filesScanned",
+        "filesParsed",
+        "nodeCount",
+        "edgeCount",
+        "durationMs"
+      ]
+    },
+    "Tech": {
+      "properties": {
+        "language": {
+          "type": "string"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "framework": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "VCS": {
+      "properties": {
+        "commit": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "dirty": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "contentHash": {
+      "type": "string"
+    },
+    "root": {
+      "$ref": "#/$defs/Root"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/Node"
+      },
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/Edge"
+      },
+      "type": "array"
+    },
+    "diagnostics": {
+      "items": {
+        "$ref": "#/$defs/Diagnostic"
+      },
+      "type": "array"
+    },
+    "stats": {
+      "$ref": "#/$defs/Stats"
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "contentHash",
+    "root",
+    "nodes",
+    "edges",
+    "diagnostics",
+    "stats"
+  ],
+  "title": "Structura Architecture Graph",
+  "description": "Graph schema version 0.1.0. Versioned independently of the structura CLI."
+}

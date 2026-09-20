@@ -1,0 +1,413 @@
+{
+  "schemaVersion": "0.1.0",
+  "generatedAt": "0001-01-01T00:00:00Z",
+  "contentHash": "sha256:b880e38369f28dfaa3179edf37884f835926112a3ea92ff1e138f4b58fbf14d5",
+  "root": {
+    "name": "terraform-serverless"
+  },
+  "nodes": [
+    {
+      "id": "boundary:terraform/root/module.network",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "network",
+      "namespace": "root",
+      "tech": {
+        "runtime": "terraform",
+        "framework": "module"
+      },
+      "attrs": {
+        "external": true,
+        "source": "terraform-aws-modules/vpc/aws",
+        "terraformModule": "network"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 85
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:terraform/root/aws_db_instance.orders",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "orders-primary",
+      "namespace": "root",
+      "tech": {
+        "runtime": "aws",
+        "framework": "rds"
+      },
+      "attrs": {
+        "address": "aws_db_instance.orders",
+        "engine": "postgres",
+        "engineVersion": "16.3",
+        "instanceClass": "db.t4g.medium",
+        "multiplicity": "count",
+        "name": "orders-primary",
+        "provider": "aws",
+        "resourceType": "aws_db_instance"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "data.tf",
+          "line": 1
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:terraform/root/aws_dynamodb_table.sessions",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "sessions",
+      "namespace": "root",
+      "tech": {
+        "runtime": "aws",
+        "framework": "dynamodb"
+      },
+      "attrs": {
+        "address": "aws_dynamodb_table.sessions",
+        "multiplicity": "for_each",
+        "name": "sessions",
+        "provider": "aws",
+        "resourceType": "aws_dynamodb_table"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "data.tf",
+          "line": 10
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:terraform/root/aws_elasticache_replication_group.cache",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "cache",
+      "namespace": "root",
+      "tech": {
+        "runtime": "aws",
+        "framework": "elasticache"
+      },
+      "attrs": {
+        "address": "aws_elasticache_replication_group.cache",
+        "provider": "aws",
+        "resourceType": "aws_elasticache_replication_group"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "data.tf",
+          "line": 15
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:terraform/root/aws_s3_bucket.shared_assets",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "acme-shared-assets",
+      "namespace": "root",
+      "tech": {
+        "runtime": "aws",
+        "framework": "s3"
+      },
+      "attrs": {
+        "address": "data.aws_s3_bucket.shared_assets",
+        "managed": false,
+        "name": "acme-shared-assets",
+        "provider": "aws",
+        "resourceType": "aws_s3_bucket"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "data.tf",
+          "line": 19
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "id": "datastore:terraform/root/aws_s3_bucket.uploads",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "orders-us-east-1-uploads",
+      "namespace": "root",
+      "tech": {
+        "runtime": "aws",
+        "framework": "s3"
+      },
+      "attrs": {
+        "address": "aws_s3_bucket.uploads",
+        "name": "orders-us-east-1-uploads",
+        "provider": "aws",
+        "resourceType": "aws_s3_bucket"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 37
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "queue:terraform/root/aws_sqs_queue.jobs",
+      "kind": "queue",
+      "layer": "container",
+      "name": "orders-us-east-1-jobs",
+      "namespace": "root",
+      "tech": {
+        "runtime": "aws",
+        "framework": "sqs"
+      },
+      "attrs": {
+        "address": "aws_sqs_queue.jobs",
+        "name": "orders-us-east-1-jobs",
+        "provider": "aws",
+        "resourceType": "aws_sqs_queue"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 28
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "queue:terraform/root/aws_sqs_queue.jobs_dlq",
+      "kind": "queue",
+      "layer": "container",
+      "name": "orders-us-east-1-jobs-dlq",
+      "namespace": "root",
+      "tech": {
+        "runtime": "aws",
+        "framework": "sqs"
+      },
+      "attrs": {
+        "address": "aws_sqs_queue.jobs_dlq",
+        "name": "orders-us-east-1-jobs-dlq",
+        "provider": "aws",
+        "resourceType": "aws_sqs_queue"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 33
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "service:terraform/root/aws_cognito_user_pool.users",
+      "kind": "service",
+      "layer": "container",
+      "name": "orders-us-east-1-users",
+      "namespace": "root",
+      "tech": {
+        "runtime": "aws",
+        "framework": "cognito"
+      },
+      "attrs": {
+        "address": "aws_cognito_user_pool.users",
+        "name": "orders-us-east-1-users",
+        "provider": "aws",
+        "resourceType": "aws_cognito_user_pool"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 90
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "service:terraform/root/aws_lambda_function.api",
+      "kind": "service",
+      "layer": "container",
+      "name": "orders-us-east-1-api",
+      "namespace": "root",
+      "tech": {
+        "runtime": "aws",
+        "framework": "lambda"
+      },
+      "attrs": {
+        "address": "aws_lambda_function.api",
+        "handler": "bootstrap",
+        "name": "orders-us-east-1-api",
+        "provider": "aws",
+        "resourceType": "aws_lambda_function",
+        "runtime": "provided.al2023"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 41
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "service:terraform/root/aws_lambda_function.worker",
+      "kind": "service",
+      "layer": "container",
+      "name": "orders-us-east-1-worker",
+      "namespace": "root",
+      "tech": {
+        "runtime": "aws",
+        "framework": "lambda"
+      },
+      "attrs": {
+        "address": "aws_lambda_function.worker",
+        "handler": "bootstrap",
+        "name": "orders-us-east-1-worker",
+        "provider": "aws",
+        "resourceType": "aws_lambda_function",
+        "runtime": "provided.al2023"
+      },
+      "sources": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 57
+        }
+      ],
+      "confidence": 1
+    }
+  ],
+  "edges": [
+    {
+      "id": "e:a90862b4a807",
+      "from": "service:terraform/root/aws_lambda_function.api",
+      "to": "datastore:terraform/root/aws_db_instance.orders",
+      "kind": "persists_to",
+      "confidence": 0.95,
+      "evidence": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 50,
+          "rule": "dns_exact",
+          "detail": "aws_lambda_function.api references aws_db_instance.orders.address (resolves to orders-primary)"
+        }
+      ]
+    },
+    {
+      "id": "e:a27278862f1c",
+      "from": "service:terraform/root/aws_lambda_function.api",
+      "to": "datastore:terraform/root/aws_dynamodb_table.sessions",
+      "kind": "persists_to",
+      "confidence": 0.95,
+      "evidence": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 51,
+          "rule": "dns_exact",
+          "detail": "aws_lambda_function.api references aws_dynamodb_table.sessions.name (resolves to sessions)"
+        }
+      ]
+    },
+    {
+      "id": "e:4d4e9926a7bc",
+      "from": "service:terraform/root/aws_lambda_function.api",
+      "to": "datastore:terraform/root/aws_s3_bucket.uploads",
+      "kind": "persists_to",
+      "confidence": 0.95,
+      "evidence": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 49,
+          "rule": "terraform_reference",
+          "detail": "aws_lambda_function.api references aws_s3_bucket.uploads.id"
+        }
+      ]
+    },
+    {
+      "id": "e:b41eb374c4ad",
+      "from": "service:terraform/root/aws_lambda_function.api",
+      "to": "queue:terraform/root/aws_sqs_queue.jobs",
+      "kind": "publishes_to",
+      "confidence": 0.95,
+      "evidence": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 48,
+          "rule": "terraform_reference",
+          "detail": "aws_lambda_function.api references aws_sqs_queue.jobs.url"
+        }
+      ]
+    },
+    {
+      "id": "e:aa459d2f662f",
+      "from": "service:terraform/root/aws_lambda_function.worker",
+      "to": "queue:terraform/root/aws_sqs_queue.jobs",
+      "kind": "publishes_to",
+      "confidence": 0.95,
+      "evidence": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 64,
+          "rule": "terraform_reference",
+          "detail": "aws_lambda_function.worker references aws_sqs_queue.jobs.url"
+        }
+      ]
+    },
+    {
+      "id": "e:d43308c92c51",
+      "from": "service:terraform/root/aws_lambda_function.worker",
+      "to": "queue:terraform/root/aws_sqs_queue.jobs_dlq",
+      "kind": "publishes_to",
+      "confidence": 0.95,
+      "evidence": [
+        {
+          "extractor": "terraform",
+          "path": "main.tf",
+          "line": 65,
+          "rule": "terraform_reference",
+          "detail": "aws_lambda_function.worker references aws_sqs_queue.jobs_dlq.url"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "info",
+      "code": "terraform_unexpanded",
+      "path": ".",
+      "message": "2 resources use count or for_each, which is not expanded; the graph shows one node each however many instances deploy: aws_db_instance.orders uses count, aws_dynamodb_table.sessions uses for_each"
+    },
+    {
+      "severity": "info",
+      "code": "terraform_external_module",
+      "path": "main.tf",
+      "line": 85,
+      "message": "module \"network\" comes from \"terraform-aws-modules/vpc/aws\", which is outside this repository; the resources it declares are not in the graph"
+    }
+  ],
+  "stats": {
+    "filesScanned": 2,
+    "filesParsed": 2,
+    "nodeCount": 11,
+    "edgeCount": 6,
+    "durationMs": 0
+  }
+}

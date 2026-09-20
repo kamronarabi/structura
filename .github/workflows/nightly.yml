@@ -1,0 +1,55 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CGO_ENABLED: "0"
+
+jobs:
+  corpus:
+    name: resolver precision on real repos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Synthetic fixtures are too clean to trust: the same person wrote the
+      # input and the expectation. This clones real repos pinned by SHA and
+      # scores the resolver against hand-written expected edges.
+      #
+      # Gate on precision, track recall. A missing edge is a visible gap the
+      # user notices; a wrong edge is invisible and flows into the LLM's
+      # reasoning as fact.
+      - name: clone corpus
+        run: |
+          if [ -f testdata/corpus.yaml ]; then make corpus; else
+            echo "::notice::no corpus manifest yet (pre-M3)"; fi
+      - name: score
+        run: |
+          if [ -f testdata/corpus.yaml ]; then make corpus-test; else
+            echo "::notice::no corpus manifest yet (pre-M3)"; fi
+
+  fuzz-long:
+    name: fuzz (10m per target)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: |
+          for pkg in $(go list ./...); do
+            for target in $(go test -list 'Fuzz.*' "$pkg" 2>/dev/null | grep '^Fuzz' || true); do
+              echo "fuzzing $target in $pkg"
+              go test "$pkg" -run '^$' -fuzz "^$target$" -fuzztime 10m || exit 1
+            done
+          done

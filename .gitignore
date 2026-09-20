@@ -30,3 +30,26 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+/plans
+
+# Build output
+/bin/
+/dist/
+
+# Scan artifacts. Ignored at any depth so that scanning a fixture repo during
+# `make demo` never dirties the tree.
+.structura/
+
+# ...except the golden fixtures, whose expected graphs are stored exactly
+# where a real scan would write them. The rule above would otherwise drop
+# every committed expectation the determinism gate compares against, and it
+# would do it silently: `git add testdata/` would simply skip them.
+!/testdata/golden/*/.structura/
+
+# Real-world repos cloned on demand by `make corpus`. Pinned by SHA in
+# testdata/corpus.yaml; never committed.
+/testdata/corpus/
+
+# macOS
+.DS_Store

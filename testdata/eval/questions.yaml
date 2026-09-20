@@ -1,0 +1,126 @@
+# Eval questions for the MCP tool surface.
+#
+# These do not test the graph — the golden tests do that. They test whether a
+# model, given only these tools, arrives at the right answer and does it in a
+# reasonable number of calls. A graph can be structurally perfect and still
+# useless if the tool surface makes the model take six calls to learn what one
+# should have told it.
+#
+# must_mention is scored case-insensitively, and each entry may list
+# alternatives separated by "|" where more than one wording is correct.
+# must_not_mention catches the failure that matters most: confident invention.
+#
+# max_tool_calls is a design budget, not a correctness threshold. Exceeding it
+# is a finding about the tool surface, reported separately from the score.
+#
+# Run with: make eval   (requires ANTHROPIC_API_KEY; not part of CI)
+
+questions:
+  - id: compose-web-dependencies
+    fixture: compose-monolith
+    question: What does the web service depend on?
+    must_mention: ["redis|cache", "postgres|db", "elasticsearch|search", "stripe"]
+    must_not_mention: ["mongodb", "kafka", "cassandra"]
+    max_tool_calls: 3
+
+  - id: compose-blast-radius
+    fixture: compose-monolith
+    question: If the Postgres database went down, which services would be affected?
+    must_mention: ["web", "worker"]
+    must_not_mention: ["elasticsearch"]
+    max_tool_calls: 4
+
+  - id: compose-third-party
+    fixture: compose-monolith
+    question: Does anything in this repository talk to a third-party payment provider?
+    must_mention: ["stripe", "web"]
+    must_not_mention: ["paypal", "braintree", "no"]
+    max_tool_calls: 3
+
+  - id: compose-queue-technology
+    fixture: compose-monolith
+    question: What message queue technology does this system use, and which service publishes to it?
+    must_mention: ["rabbitmq", "worker"]
+    must_not_mention: ["kafka", "sqs"]
+    max_tool_calls: 3
+
+  - id: k8s-checkout-dependencies
+    fixture: k8s-microservices
+    question: What does the checkout service depend on?
+    must_mention: ["orders-db|postgres", "stripe"]
+    must_not_mention: ["session-cache", "analytics"]
+    max_tool_calls: 3
+
+  - id: k8s-ingress-path
+    fixture: k8s-microservices
+    question: How does traffic from the internet reach the checkout service?
+    must_mention: ["ingress|public", "checkout"]
+    must_not_mention: []
+    max_tool_calls: 4
+
+  - id: k8s-unresolved
+    fixture: k8s-microservices
+    question: Are there any dependencies this scan could not resolve? Name them.
+    must_mention: ["user-service", "search-service", "broker"]
+    must_not_mention: []
+    max_tool_calls: 3
+
+  - id: k8s-who-uses-redis
+    fixture: k8s-microservices
+    question: Which component uses Redis?
+    must_mention: ["api-gateway", "session-cache"]
+    must_not_mention: ["checkout"]
+    max_tool_calls: 3
+
+  - id: k8s-confidence
+    fixture: k8s-microservices
+    question: >-
+      How confident is the relationship between api-gateway and
+      analytics.example.com, and what is the evidence for it?
+    must_mention: ["0.7", "env|environment"]
+    must_not_mention: ["certain", "1.00"]
+    max_tool_calls: 3
+
+  - id: k8s-transitive
+    fixture: k8s-microservices
+    question: Can api-gateway reach orders-db, and if so how?
+    must_mention: ["checkout", "yes|can|through|via"]
+    must_not_mention: ["directly|no path"]
+    max_tool_calls: 4
+
+  - id: polyglot-gateway
+    fixture: polyglot-monorepo
+    question: What does the gateway service call?
+    must_mention: ["checkout", "cache|redis"]
+    must_not_mention: ["broker", "orders-db"]
+    max_tool_calls: 3
+
+  - id: polyglot-publisher
+    fixture: polyglot-monorepo
+    question: Which service publishes to the message broker?
+    must_mention: ["checkout"]
+    must_not_mention: ["gateway", "recommendations"]
+    max_tool_calls: 3
+
+  - id: terraform-api-writes
+    fixture: terraform-serverless
+    question: Which AWS data stores does the api service write to?
+    must_mention: ["orders-primary", "sessions", "uploads"]
+    must_not_mention: []
+    max_tool_calls: 3
+
+  - id: terraform-incomplete
+    fixture: terraform-serverless
+    question: >-
+      Is the picture of this infrastructure complete, or is something missing
+      from it?
+    must_mention: ["count|for_each|for each", "module|network|vpc"]
+    must_not_mention: ["complete and accurate"]
+    max_tool_calls: 3
+
+  - id: terraform-worker-storage
+    fixture: terraform-serverless
+    question: Does the worker write to any database?
+    must_mention: ["no|does not|doesn't", "queue|jobs"]
+    must_not_mention: ["orders-primary"]
+    max_tool_calls: 3

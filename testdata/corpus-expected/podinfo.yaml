@@ -1,0 +1,29 @@
+repo: podinfo
+source: |
+  stefanprodan/podinfo, read directly rather than from a published diagram,
+  because podinfo is a demo application rather than a system with an
+  architecture document.
+
+  Three relationships are declared in files this scan reads:
+
+  - otel/docker-compose.yaml runs podinfo_frontend and podinfo_backend, both
+    with OTEL_EXPORTER_OTLP_ENDPOINT=http://otel:4317, alongside an otel
+    collector service.
+  - otel/docker-compose.yaml points podinfo_frontend at podinfo_backend via
+    --backend-url http://podinfo_backend:9899.
+  - deploy/bases/frontend/cronjob-warm-cache.yaml is a CronJob that curls the
+    frontend service every five minutes.
+
+  Not findable, and deliberately not listed: podinfo's Redis integration is
+  configured only in timoni/podinfo/templates/config.cue. CUE is not a format
+  this scan parses, so requiring that edge would be measuring the absence of a
+  Phase 2 extractor rather than the resolver.
+
+edges:
+  - {from: podinfo_frontend, to: otel}
+  - {from: podinfo_backend, to: otel}
+  - {from: warm-cache, to: frontend}
+
+allowed:
+  - {from: podinfo_frontend, to: podinfo_backend}
+  - {from: frontend, to: backend}

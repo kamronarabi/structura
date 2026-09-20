@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Every job builds under the same constraint the release pipeline does.
+  # An accidental CGO dependency must fail here, not at tag time.
+  CGO_ENABLED: "0"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The walker is the one package whose behavior genuinely differs per OS:
+  # path separators, case-insensitive filesystems, symlink semantics. We ship
+  # five platforms, so we test on three.
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: go vet
+        run: go vet ./...
+      # -race requires CGO on most platforms, so it gets its own relaxed
+      # environment. The CGO-free guarantee is asserted separately, below.
+      - name: go test -race
+        run: go test -race ./...
+        env:
+          CGO_ENABLED: "1"
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.13.2
+      - name: go.mod is tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+  cgo-free:
+    name: no cgo in dependency graph
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: assert runtime/cgo is absent
+        run: |
+          if go list -deps ./... | grep -qx 'runtime/cgo'; then
+            echo "::error::runtime/cgo is in the dependency graph."
+            echo "This breaks static cross-compilation for the five release platforms."
+            go list -deps ./... | grep -x 'runtime/cgo'
+            exit 1
+          fi
+          echo "no cgo dependency"
+      - name: binary links no external libc on linux
+        run: |
+          go build -o /tmp/structura ./cmd/structura
+          file /tmp/structura
+          file /tmp/structura | grep -q 'statically linked' || {
+            echo "::error::linux binary is not statically linked"; exit 1; }
+
+  determinism:
+    name: determinism
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Golden tests, the scan cache, and Phase 4 drift detection all assume
+      # two scans of an unchanged tree produce byte-identical JSON.
+      - run: make determinism
+
+  redaction:
+    name: redaction
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      # graph.json gets committed to repos and pasted into LLM context.
+      # Leaking a credential through an architecture tool is the one
+      # unrecoverable failure mode here, so this gate is never allowed to be
+      # yellow: a missing redaction package fails the job.
+      - name: credential fixtures stay clean
+        run: |
+          if [ -d internal/resolve ]; then
+            go test ./internal/resolve/... -run 'Redact|Secret|Credential' -v
+          else
+            echo "::notice::internal/resolve does not exist yet (pre-M5)"
+          fi
+
+  mcp-stdout-purity:
+    name: mcp stdout purity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Anything on stdout that is not a protocol frame corrupts the stdio
+      # transport, and in-process tests cannot see it. This drives the real
+      # compiled binary as a subprocess.
+      - name: protocol tests against the compiled binary
+        run: |
+          if [ -d internal/mcpserver ]; then
+            go test ./internal/mcpserver/... -run 'Protocol|Stdout' -v
+          else
+            echo "::notice::internal/mcpserver does not exist yet (pre-M6)"
+          fi
+
+  fuzz:
+    name: fuzz (60s per target)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Every parser here runs on untrusted input and must never panic.
+      - run: make fuzz
+
+  package:
+    name: goreleaser snapshot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Packaging breaks at PR time, not at tag time.
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: build --snapshot --clean

@@ -1,0 +1,19 @@
+replicaCount: 3
+
+image:
+  repository: ghcr.io/acme/api
+  tag: "1.2.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+env:
+  DATABASE_URL: postgres://api@api-postgresql:5432/api
+  REDIS_URL: redis://api-redis-master:6379
+
+ingress:
+  enabled: true
+  hosts:
+    - host: api.acme.example.com

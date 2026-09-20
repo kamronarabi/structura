@@ -1,0 +1,184 @@
+{
+  "schemaVersion": "0.1.0",
+  "generatedAt": "2026-09-20T23:12:17Z",
+  "contentHash": "sha256:463414e6869039d37337a1b2b07ddcc0ca47b5231a91a3347060ffe1981ed743",
+  "root": {
+    "name": "multi-environment"
+  },
+  "nodes": [
+    {
+      "id": "datastore:k8s/dev/db",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "db",
+      "namespace": "dev",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "postgresql"
+      },
+      "attrs": {
+        "image": "postgres:16",
+        "images": [
+          "postgres:16"
+        ],
+        "labels": {
+          "app": "db"
+        },
+        "workload": "StatefulSet"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "overlays/dev/db.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:k8s/prod/db",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "db",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "postgresql"
+      },
+      "attrs": {
+        "image": "postgres:16",
+        "images": [
+          "postgres:16"
+        ],
+        "labels": {
+          "app": "db"
+        },
+        "workload": "StatefulSet"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "overlays/prod/db.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:k8s/staging/db",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "db",
+      "namespace": "staging",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "postgresql"
+      },
+      "attrs": {
+        "image": "postgres:16",
+        "images": [
+          "postgres:16"
+        ],
+        "labels": {
+          "app": "db"
+        },
+        "workload": "StatefulSet"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "overlays/staging/db.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "service:k8s/default/api",
+      "kind": "service",
+      "layer": "container",
+      "name": "api",
+      "namespace": "default",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "image": "ghcr.io/acme/api:latest",
+        "images": [
+          "ghcr.io/acme/api:latest"
+        ],
+        "labels": {
+          "app": "api"
+        },
+        "workload": "Deployment"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "base/api.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    }
+  ],
+  "edges": [],
+  "diagnostics": [
+    {
+      "severity": "warn",
+      "code": "ambiguous_reference",
+      "path": "base/api.yaml",
+      "line": 4,
+      "message": "\"postgres://api@db:5432/api\" matches 3 components (db.dev, db.prod, db.staging), so no edge was drawn; qualify the reference or scope it to a namespace"
+    },
+    {
+      "severity": "info",
+      "code": "kustomize_unrendered",
+      "path": "base/kustomization.yaml",
+      "message": "Kustomize overlay not applied; the manifests it lists were read directly, so its patches, name prefixes, and namespace are not reflected"
+    },
+    {
+      "severity": "info",
+      "code": "kustomize_unrendered",
+      "path": "overlays/dev/kustomization.yaml",
+      "message": "Kustomize overlay not applied; the manifests it lists were read directly, so its patches, name prefixes, and namespace are not reflected"
+    },
+    {
+      "severity": "info",
+      "code": "k8s_patch_fragment",
+      "path": "overlays/dev/replicas.yaml",
+      "message": "a manifest declaring no pod template was read as a patch rather than a component; its overrides are not reflected"
+    },
+    {
+      "severity": "info",
+      "code": "kustomize_unrendered",
+      "path": "overlays/prod/kustomization.yaml",
+      "message": "Kustomize overlay not applied; the manifests it lists were read directly, so its patches, name prefixes, and namespace are not reflected"
+    },
+    {
+      "severity": "info",
+      "code": "k8s_patch_fragment",
+      "path": "overlays/prod/replicas.yaml",
+      "message": "a manifest declaring no pod template was read as a patch rather than a component; its overrides are not reflected"
+    },
+    {
+      "severity": "info",
+      "code": "kustomize_unrendered",
+      "path": "overlays/staging/kustomization.yaml",
+      "message": "Kustomize overlay not applied; the manifests it lists were read directly, so its patches, name prefixes, and namespace are not reflected"
+    },
+    {
+      "severity": "info",
+      "code": "k8s_patch_fragment",
+      "path": "overlays/staging/replicas.yaml",
+      "message": "a manifest declaring no pod template was read as a patch rather than a component; its overrides are not reflected"
+    }
+  ],
+  "stats": {
+    "filesScanned": 11,
+    "filesParsed": 11,
+    "nodeCount": 4,
+    "edgeCount": 0,
+    "durationMs": 0
+  }
+}

@@ -1,0 +1,94 @@
+version: "2"
+
+run:
+  timeout: 5m
+  # The distribution promise (static, zero-dependency, five platforms) holds
+  # only while nothing pulls in CGO. Lint under the same constraint as CI.
+  build-tags: []
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - errorlint
+    - forbidigo
+    - gocritic
+    - misspell
+    - nilerr
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+
+  settings:
+    errcheck:
+      # A CLI cannot do anything useful about a failed write to a terminal,
+      # and wrapping every render line in `_, _ =` hides the checks that do
+      # matter. Writes that reach disk go through os.WriteFile or an encoder,
+      # which stay checked.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*text/tabwriter.Writer).Flush
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # The MCP server speaks JSON-RPC over stdio. Anything written to
+        # stdout that is not a protocol frame corrupts the transport, and the
+        # user-facing symptom is an opaque parse error in their IDE with no
+        # indication it came from us. Rendering to stdout is allowed only in
+        # internal/cli, via cmd.OutOrStdout().
+        - pattern: ^fmt\.Print(f|ln)?$
+          msg: "writing to stdout corrupts the MCP stdio transport; use cmd.OutOrStdout() in internal/cli, or log to stderr"
+        - pattern: ^print(ln)?$
+          msg: "builtin print writes to stderr unbuffered; use a logger"
+        - pattern: ^os\.Stdout$
+          msg: "referencing os.Stdout outside internal/cli risks corrupting the MCP stdio transport"
+    misspell:
+      # Product names the dictionary reads as typos.
+      ignore-rules:
+        - mosquitto
+    revive:
+      rules:
+        - name: exported
+          disabled: false
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+      disabled-checks:
+        - ifElseChain
+
+  exclusions:
+    generated: lax
+    rules:
+      # internal/cli is the one package allowed to render to stdout.
+      - path: ^internal/cli/
+        linters:
+          - forbidigo
+      # cmd/structura owns process wiring, including os.Stdout.
+      - path: ^cmd/structura/
+        linters:
+          - forbidigo
+      # internal/devtools holds standalone developer commands that are never
+      # imported by the shipped binary, so they cannot reach the MCP
+      # transport. Verified by the cgo-free job's dependency listing, which
+      # only walks ./cmd/structura.
+      - path: ^internal/devtools/
+        linters:
+          - forbidigo
+      - path: _test\.go$
+        linters:
+          - forbidigo
+          - unparam
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/kamronarabi/structura

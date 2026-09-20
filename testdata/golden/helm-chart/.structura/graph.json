@@ -1,0 +1,217 @@
+{
+  "schemaVersion": "0.1.0",
+  "generatedAt": "2026-09-20T23:12:17Z",
+  "contentHash": "sha256:eb0e4d541e9ecee413a6d604f23e9adc2c6c6101ed85fc19014fd5bef9f3b716",
+  "root": {
+    "name": "helm-chart"
+  },
+  "nodes": [
+    {
+      "id": "boundary:helm/api/api",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "api",
+      "namespace": "api",
+      "attrs": {
+        "appVersion": "1.2.0",
+        "chartVersion": "0.3.1",
+        "packaging": "helm"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/api/Chart.yaml",
+          "line": 2
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:helm/api/postgresql",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "postgresql",
+      "namespace": "api",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "postgresql"
+      },
+      "attrs": {
+        "chart": "postgresql",
+        "chartRepository": "https://charts.bitnami.com/bitnami",
+        "chartVersion": "14.x.x",
+        "packaging": "helm-subchart"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/api/Chart.yaml",
+          "line": 2
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "id": "datastore:helm/api/redis",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "redis",
+      "namespace": "api",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "redis"
+      },
+      "attrs": {
+        "chart": "redis",
+        "chartRepository": "https://charts.bitnami.com/bitnami",
+        "chartVersion": "18.x.x",
+        "packaging": "helm-subchart"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/api/Chart.yaml",
+          "line": 2
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "id": "external:resolver/net/api.acme.example.com",
+      "kind": "external",
+      "layer": "context",
+      "name": "api.acme.example.com",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "api.acme.example.com"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/api/values.yaml"
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "service:helm/api/api",
+      "kind": "service",
+      "layer": "container",
+      "name": "api",
+      "namespace": "api",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "image": "ghcr.io/acme/api:1.2.0",
+        "packaging": "helm",
+        "ports": [
+          8080
+        ],
+        "replicas": 3
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/api/values.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 0.4
+    }
+  ],
+  "edges": [
+    {
+      "id": "e:d605417aa310",
+      "from": "boundary:helm/api/api",
+      "to": "datastore:helm/api/postgresql",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "helm",
+          "path": "charts/api/Chart.yaml",
+          "line": 2,
+          "rule": "helm_chart_dependency",
+          "detail": "chart \"api\" declares a dependency on subchart \"postgresql\""
+        }
+      ]
+    },
+    {
+      "id": "e:e0fd2ded9f1d",
+      "from": "boundary:helm/api/api",
+      "to": "datastore:helm/api/redis",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "helm",
+          "path": "charts/api/Chart.yaml",
+          "line": 2,
+          "rule": "helm_chart_dependency",
+          "detail": "chart \"api\" declares a dependency on subchart \"redis\""
+        }
+      ]
+    },
+    {
+      "id": "e:6aa1e52b7819",
+      "from": "service:helm/api/api",
+      "to": "datastore:helm/api/postgresql",
+      "kind": "persists_to",
+      "protocol": "postgres",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "helm",
+          "path": "charts/api/values.yaml",
+          "line": 13,
+          "rule": "dns_exact",
+          "detail": "values env.DATABASE_URL=postgres://api@api-postgresql:5432/api (resolves to postgresql)"
+        }
+      ]
+    },
+    {
+      "id": "e:6dfb14f1678b",
+      "from": "service:helm/api/api",
+      "to": "external:resolver/net/api.acme.example.com",
+      "kind": "calls",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "helm",
+          "path": "charts/api/values.yaml",
+          "rule": "external_host",
+          "detail": "values ingress.hosts.0.host=api.acme.example.com (resolves to api.acme.example.com)"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warn",
+      "code": "helm_unrendered",
+      "path": "charts/api/templates",
+      "message": "3 Helm templates not rendered; components declared only in this chart are missing from the graph"
+    },
+    {
+      "severity": "info",
+      "code": "helm_values_inferred",
+      "path": "charts/api/values.yaml",
+      "message": "component \"api\" was inferred from chart default values rather than rendered templates; its name and settings may differ at install time"
+    },
+    {
+      "severity": "info",
+      "code": "unresolved_reference",
+      "path": "charts/api/values.yaml",
+      "line": 14,
+      "message": "\"api.api\" refers to \"api-redis-master\", which matches no component in this repository"
+    }
+  ],
+  "stats": {
+    "filesScanned": 6,
+    "filesParsed": 5,
+    "nodeCount": 5,
+    "edgeCount": 4,
+    "durationMs": 0
+  }
+}

@@ -1,0 +1,41 @@
+repo: sock-shop
+source: |
+  microservices-demo/microservices-demo (Weaveworks Sock Shop). Edges taken
+  from the project's published architecture diagram and the per-service
+  READMEs.
+
+  Sock Shop is a deliberate stress case for this resolver: most services find
+  each other through hardcoded DNS defaults compiled into the application
+  code, not through environment variables or manifests. Much of the
+  application architecture is therefore invisible to a configuration-only
+  scan, and that shows up here as low recall rather than as wrong edges.
+
+edges:
+  - {from: front-end, to: catalogue}
+  - {from: front-end, to: carts}
+  - {from: front-end, to: orders}
+  - {from: front-end, to: user}
+  - {from: orders, to: payment}
+  - {from: orders, to: shipping}
+  - {from: orders, to: carts}
+  - {from: orders, to: user}
+  - {from: carts, to: carts-db}
+  - {from: catalogue, to: catalogue-db}
+  - {from: orders, to: orders-db}
+  - {from: user, to: user-db}
+  - {from: shipping, to: rabbitmq}
+  - {from: queue-master, to: rabbitmq}
+
+allowed:
+  # A logging compose file wires every service to a log collector, and the
+  # monitoring stack wires itself together. Both are declared outright, so
+  # finding them is correct; neither is application architecture.
+  - {from: "*", to: log-server}
+  - {from: "*", to: elasticsearch}
+  - {from: kibana, to: elasticsearch}
+  - {from: grafana, to: prometheus}
+  - {from: prometheus, to: alertmanager}
+  - {from: importer, to: grafana}
+  - {from: monitoring-grafana, to: monitoring-influxdb}
+  - {from: "*", to: k8s-node}
+  - {from: "*", to: ci-sockshop-k8s-node}

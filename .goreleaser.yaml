@@ -1,0 +1,163 @@
+# GoReleaser configuration for Structura.
+# Docs: https://goreleaser.com
+version: 2
+
+project_name: structura
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: structura
+    main: ./cmd/structura
+    binary: structura
+    env:
+      # Non-negotiable: static binaries on five platforms is the distribution
+      # promise. CGO would require per-platform C toolchains and produce
+      # dynamically linked output.
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .FullCommit }}
+      - -X main.date={{ .CommitDate }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64, arm]
+    goarm: ["7"]
+    ignore:
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+
+universal_binaries:
+  - id: structura
+    replace: false
+
+archives:
+  - id: default
+    ids: [structura]
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+sboms:
+  - id: archive
+    artifacts: archive
+
+signs:
+  - id: cosign-checksum
+    cmd: cosign
+    artifacts: checksum
+    certificate: "${artifact}.pem"
+    output: true
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+
+nfpms:
+  - id: packages
+    ids: [structura]
+    package_name: structura
+    vendor: Structura
+    homepage: https://structura.dev/
+    maintainer: Kamron Arabi <kamronarabi@gmail.com>
+    description: |-
+      Map your architecture from the configs you already have.
+      Structura builds an architecture graph from your infrastructure
+      manifests and serves it to AI coding agents over MCP.
+    license: Apache-2.0
+    formats: [deb, rpm, apk]
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/structura/LICENSE
+      - src: NOTICE
+        dst: /usr/share/doc/structura/NOTICE
+
+homebrew_casks:
+  - name: structura
+    ids: [default]
+    repository:
+      owner: kamronarabi
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://structura.dev/
+    description: Map your architecture from the configs you already have
+    license: Apache-2.0
+    commit_author:
+      name: goreleaser-bot
+      email: bot@structura.dev
+    # Released binaries are signed but not yet Apple-notarized, so strip the
+    # quarantine attribute Gatekeeper applies to downloaded files.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr",
+                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/structura"]
+          end
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Performance
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Other
+      order: 99
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+
+release:
+  github:
+    owner: kamronarabi
+    name: structura
+  draft: false
+  prerelease: auto
+  footer: |
+    ## Install
+
+    ```sh
+    brew install kamronarabi/tap/structura
+    ```
+
+    Then, in any repository:
+
+    ```sh
+    structura scan
+    structura install-mcp --client claude-code
+    ```

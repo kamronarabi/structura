@@ -1,0 +1,369 @@
+{
+  "schemaVersion": "0.1.0",
+  "generatedAt": "2026-09-20T23:12:29Z",
+  "contentHash": "sha256:21b037c950861a15cfc29b6b365b4561ef274e6e2f51137deadfbf0c548d9153",
+  "root": {
+    "name": "k8s-microservices"
+  },
+  "nodes": [
+    {
+      "id": "cloud_resource:k8s/prod/public",
+      "kind": "cloud_resource",
+      "layer": "container",
+      "name": "public",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "ingress"
+      },
+      "attrs": {
+        "hosts": [
+          "shop.example.com"
+        ],
+        "ingressClass": "nginx",
+        "tls": true,
+        "workload": "Ingress"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/ingress.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:k8s/prod/orders-db",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "orders-db",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "postgresql"
+      },
+      "attrs": {
+        "image": "postgres:16-alpine",
+        "images": [
+          "postgres:16-alpine"
+        ],
+        "labels": {
+          "app": "orders-db"
+        },
+        "ports": [
+          5432
+        ],
+        "replicas": 1,
+        "workload": "StatefulSet"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:k8s/prod/session-cache",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "session-cache",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "redis"
+      },
+      "attrs": {
+        "image": "redis:7-alpine",
+        "images": [
+          "redis:7-alpine"
+        ],
+        "labels": {
+          "app": "session-cache"
+        },
+        "workload": "Deployment"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 26
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "external:resolver/net/analytics.example.com",
+      "kind": "external",
+      "layer": "context",
+      "name": "analytics.example.com",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "analytics.example.com"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "external:resolver/net/api.stripe.com",
+      "kind": "external",
+      "layer": "context",
+      "name": "api.stripe.com",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "api.stripe.com"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/checkout.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "external:resolver/net/warehouse.legacy.internal",
+      "kind": "external",
+      "layer": "context",
+      "name": "warehouse.legacy.internal",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "warehouse.legacy.internal"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 55
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "service:k8s/prod/api-gateway",
+      "kind": "service",
+      "layer": "container",
+      "name": "api-gateway",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "image": "ghcr.io/acme/api-gateway:1.2.0",
+        "images": [
+          "ghcr.io/acme/api-gateway:1.2.0"
+        ],
+        "labels": {
+          "app": "api-gateway"
+        },
+        "ports": [
+          8080
+        ],
+        "replicas": 3,
+        "serviceAccount": "api-gateway",
+        "workload": "Deployment"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "service:k8s/prod/checkout",
+      "kind": "service",
+      "layer": "container",
+      "name": "checkout",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "image": "ghcr.io/acme/checkout:2.0.1",
+        "images": [
+          "ghcr.io/acme/checkout:2.0.1"
+        ],
+        "labels": {
+          "app": "checkout"
+        },
+        "ports": [
+          8080
+        ],
+        "replicas": 2,
+        "workload": "Deployment"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/checkout.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    }
+  ],
+  "edges": [
+    {
+      "id": "e:12a90f37ed2f",
+      "from": "cloud_resource:k8s/prod/public",
+      "to": "service:k8s/prod/api-gateway",
+      "kind": "exposes",
+      "protocol": "http",
+      "confidence": 0.95,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/ingress.yaml",
+          "line": 4,
+          "rule": "dns_exact",
+          "detail": "Ingress \"public\" routes shop.example.com/api to Service \"api-gateway\" (resolves to api-gateway)"
+        }
+      ]
+    },
+    {
+      "id": "e:36ffc49c45a1",
+      "from": "cloud_resource:k8s/prod/public",
+      "to": "service:k8s/prod/checkout",
+      "kind": "exposes",
+      "protocol": "http",
+      "confidence": 0.95,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/ingress.yaml",
+          "line": 4,
+          "rule": "dns_exact",
+          "detail": "Ingress \"public\" routes shop.example.com/checkout to Service \"checkout\" (resolves to checkout)"
+        }
+      ]
+    },
+    {
+      "id": "e:5459f8b281ba",
+      "from": "service:k8s/prod/api-gateway",
+      "to": "datastore:k8s/prod/session-cache",
+      "kind": "persists_to",
+      "protocol": "redis",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4,
+          "rule": "dns_exact",
+          "detail": "container \"api\" env REDIS_URL=redis://session-cache:6379/0 (resolves to session-cache)"
+        }
+      ]
+    },
+    {
+      "id": "e:a59a8fed42e9",
+      "from": "service:k8s/prod/api-gateway",
+      "to": "external:resolver/net/analytics.example.com",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.7,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4,
+          "rule": "external_host",
+          "detail": "container \"api\" takes its environment from ConfigMap \"shared-endpoints\"; ConfigMap \"shared-endpoints\" key ANALYTICS_URL=https://analytics.example.com/ingest (resolves to analytics.example.com)"
+        }
+      ]
+    },
+    {
+      "id": "e:6aa274ff0c0d",
+      "from": "service:k8s/prod/api-gateway",
+      "to": "service:k8s/prod/checkout",
+      "kind": "calls",
+      "protocol": "http",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4,
+          "rule": "dns_exact",
+          "detail": "container \"api\" env CHECKOUT_SVC_URL=http://checkout.prod.svc.cluster.local:8080 (resolves to checkout)"
+        }
+      ]
+    },
+    {
+      "id": "e:178e6b350e4a",
+      "from": "service:k8s/prod/checkout",
+      "to": "datastore:k8s/prod/orders-db",
+      "kind": "persists_to",
+      "protocol": "postgres",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/checkout.yaml",
+          "line": 4,
+          "rule": "dns_exact",
+          "detail": "container \"checkout\" env DATABASE_URL=postgres://***:***@orders-db:5432/orders (resolves to orders-db)"
+        }
+      ]
+    },
+    {
+      "id": "e:0e669aed75df",
+      "from": "service:k8s/prod/checkout",
+      "to": "external:resolver/net/api.stripe.com",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/checkout.yaml",
+          "line": 4,
+          "rule": "external_host",
+          "detail": "container \"checkout\" env STRIPE_API_URL=https://api.stripe.com (resolves to api.stripe.com)"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "info",
+      "code": "unresolved_reference",
+      "path": "deploy/prod/api-gateway.yaml",
+      "line": 4,
+      "message": "\"api-gateway.prod\" refers to \"search-service\", which matches no component in this repository"
+    },
+    {
+      "severity": "info",
+      "code": "unresolved_reference",
+      "path": "deploy/prod/api-gateway.yaml",
+      "line": 4,
+      "message": "\"api-gateway.prod\" refers to \"user-service\", which matches no component in this repository"
+    },
+    {
+      "severity": "info",
+      "code": "unresolved_reference",
+      "path": "deploy/prod/checkout.yaml",
+      "line": 4,
+      "message": "\"checkout.prod\" refers to \"broker\", which matches no component in this repository"
+    }
+  ],
+  "stats": {
+    "filesScanned": 4,
+    "filesParsed": 4,
+    "nodeCount": 8,
+    "edgeCount": 7,
+    "durationMs": 0
+  }
+}
