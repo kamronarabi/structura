@@ -653,3 +653,96 @@ func TestBoundariesAreNeverResolutionTargets(t *testing.T) {
 		}
 	}
 }
+
+// TestDeploymentJoinsItsCodeWithoutABuildContext covers the common case that
+// went unhandled.
+//
+// A Kubernetes Deployment references an image, not a path, so the build
+// context join never fired for a manifest repository. Every service was drawn
+// twice: a container with no language, and a codebase with no deployment. For
+// a diagram that is not a missing detail, it is the same box twice.
+func TestDeploymentJoinsItsCodeWithoutABuildContext(t *testing.T) {
+	b := &builder{}
+	code := b.node(schema.KindService, "manifest", "go", "checkoutservice",
+		schema.Attrs{"directory": "src/checkoutservice", "module": "acme/checkoutservice"})
+	b.in.Nodes[len(b.in.Nodes)-1].Tech = &schema.Tech{Language: "go"}
+	deployment := b.node(schema.KindService, "k8s", "default", "checkoutservice",
+		schema.Attrs{"image": "checkoutservice:1.0"})
+
+	r := b.run()
+
+	ids := map[string]bool{}
+	for _, n := range r.Nodes {
+		ids[n.ID] = true
+	}
+	if ids[code] {
+		t.Errorf("the codebase survived as its own node; the diagram would draw "+
+			"%s twice", "checkoutservice")
+	}
+	if !ids[deployment] {
+		t.Fatal("the deployment was merged away; it is the thing that runs")
+	}
+	for _, n := range r.Nodes {
+		if n.ID != deployment {
+			continue
+		}
+		if n.Tech == nil || n.Tech.Language != "go" {
+			t.Errorf("the language the codebase knew was not carried over: %+v", n.Tech)
+		}
+	}
+	if !r.hasDiag("code_joined_to_deployment") {
+		t.Error("an inferred join was not reported; it has to be auditable")
+	}
+}
+
+// TestNameCollisionAcrossProjectsIsNotAJoin is the guard on that inference.
+//
+// A repository of independent samples has a dozen services called "web". Each
+// would claim the one web/package.json, and checking only that a deployment
+// found exactly one codebase does not catch it -- the check has to be unique
+// in both directions. Fusing two unrelated stacks into one box is worse than
+// drawing two.
+func TestNameCollisionAcrossProjectsIsNotAJoin(t *testing.T) {
+	b := &builder{}
+	code := b.node(schema.KindService, "manifest", "javascript", "web",
+		schema.Attrs{"directory": "nginx-nodejs-redis/web"})
+	for _, project := range []string{"angular", "django", "nginx-flask-mongo"} {
+		b.node(schema.KindService, "compose", project, "web",
+			schema.Attrs{"image": "web:latest"})
+	}
+
+	r := b.run()
+
+	var found bool
+	for _, n := range r.Nodes {
+		if n.ID == code {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("a codebase claimed by several unrelated projects was merged into one of them")
+	}
+	if r.hasDiag("code_joined_to_deployment") {
+		t.Error("an ambiguous join was reported as made")
+	}
+}
+
+// TestBuildContextJoinStillWins keeps the stronger signal authoritative.
+func TestBuildContextJoinStillWins(t *testing.T) {
+	b := &builder{}
+	code := b.node(schema.KindService, "manifest", "go", "checkout",
+		schema.Attrs{"directory": "services/checkout"})
+	b.node(schema.KindService, "compose", "shop", "checkout",
+		schema.Attrs{"buildContext": "services/checkout", "image": "shop-checkout"})
+
+	r := b.run()
+	for _, n := range r.Nodes {
+		if n.ID == code {
+			t.Error("a build context named the directory outright and the join did not happen")
+		}
+	}
+	// A declared build context infers nothing, so it is not reported.
+	if r.hasDiag("code_joined_to_deployment") {
+		t.Error("a declared build context was reported as an inference")
+	}
+}

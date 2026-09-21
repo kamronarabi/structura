@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -147,16 +148,26 @@ func (r *resolver) externalAlias(alias Alias) {
 // happens to be indexed. Joining them on the build context is what lets the
 // graph say a service is Go rather than leaving it an anonymous container.
 func (r *resolver) mergeCodeIntoDeployments() {
+	// Collected first, applied second. A join has to be unique in both
+	// directions: one deployment claiming one codebase is a convention, but
+	// ten deployments all named "web" claiming the same web/package.json is
+	// a name collision between unrelated projects. Checking only that a
+	// deployment found one codebase misses that entirely, and fuses two
+	// sample stacks that share nothing.
+	claims := map[string][]string{} // code node -> deployments claiming it
+	byDirBase := r.codeByDirectoryBase()
 	for _, identity := range r.index.AllIdentities() {
-		if identity.BuildContext == "" {
-			continue
+		if code, ok := r.codeFor(identity, byDirBase); ok {
+			claims[code] = append(claims[code], identity.NodeID)
 		}
-		candidates := r.index.NodesInDirectory(identity.BuildContext)
-		if len(candidates) != 1 || candidates[0] == identity.NodeID {
-			continue
-		}
+	}
 
-		code, deployment := candidates[0], identity.NodeID
+	for _, identity := range r.index.AllIdentities() {
+		code, ok := r.codeFor(identity, byDirBase)
+		if !ok || len(claims[code]) != 1 {
+			continue
+		}
+		deployment := identity.NodeID
 		codeNode, ok := r.byID[code]
 		if !ok {
 			continue
@@ -193,7 +204,95 @@ func (r *resolver) mergeCodeIntoDeployments() {
 		}
 		deploymentNode.Sources = append(deploymentNode.Sources, codeNode.Sources...)
 		r.merges[code] = deployment
+
+		// Inferred joins are reported; a build context is not, because it
+		// names the directory outright and infers nothing.
+		if identity.BuildContext == "" {
+			r.diags = append(r.diags, schema.Diagnostic{
+				Severity: schema.SeverityInfo,
+				Code:     "code_joined_to_deployment",
+				Message: fmt.Sprintf(
+					"%s and %s were treated as one component, because the workload is named "+
+						"after the directory its code lives in; they are drawn as one box",
+					r.displayName(code), r.displayName(deployment)),
+			})
+		}
 	}
+}
+
+// codeByDirectoryBase indexes source components by the last segment of their
+// directory, which is what a repository names after the service.
+//
+// Only components that carry a directory and no image are considered: those
+// are codebases. A deployment has an image and is the thing being merged
+// into, never the thing merged away.
+func (r *resolver) codeByDirectoryBase() map[string][]string {
+	out := map[string][]string{}
+	for _, id := range r.index.AllIdentities() {
+		if id.Directory == "" || len(id.Images) > 0 {
+			continue
+		}
+		base := strings.ToLower(path.Base(id.Directory))
+		if base == "" || base == "." || base == "/" {
+			continue
+		}
+		out[base] = append(out[base], id.NodeID)
+	}
+	return out
+}
+
+// codeFor finds the codebase that a deployment runs, if exactly one is
+// identifiable.
+//
+// Two joins, in descending order of how much they prove:
+//
+// A Compose build context names the directory outright, so nothing is being
+// inferred. Kubernetes has no equivalent -- a Deployment references an image,
+// not a path -- so a manifest-only repository never merged at all, and the
+// common case went unhandled: the graph drew every service twice, once as a
+// container with no language and once as a codebase with no deployment.
+//
+// The second join closes that, on the convention a monorepo almost always
+// follows: the image or workload is named after the directory the code lives
+// in. src/checkoutservice builds the image checkoutservice. It is inference,
+// so it demands a unique match and is reported as a diagnostic -- fusing two
+// unrelated services into one box is worse than drawing two.
+func (r *resolver) codeFor(deployment *Identity, byDirBase map[string][]string) (code string, ok bool) {
+	if deployment.BuildContext != "" {
+		candidates := r.index.NodesInDirectory(deployment.BuildContext)
+		if len(candidates) == 1 && candidates[0] != deployment.NodeID {
+			return candidates[0], true
+		}
+		return "", false
+	}
+	if len(deployment.Images) == 0 {
+		return "", false
+	}
+
+	// The names this deployment might be known by: its own, and the base name
+	// of each image it runs.
+	keys := map[string]bool{}
+	for _, name := range deployment.Names {
+		keys[strings.ToLower(name)] = true
+	}
+	for _, image := range deployment.Images {
+		keys[strings.ToLower(path.Base(image))] = true
+	}
+
+	var matches []string
+	for key := range keys {
+		for _, id := range byDirBase[key] {
+			if id != deployment.NodeID {
+				matches = append(matches, id)
+			}
+		}
+	}
+	matches = dedupe(matches)
+	if len(matches) != 1 {
+		return "", false
+	}
+
+	return matches[0], true
 }
 
 // expandConfigMaps transfers a ConfigMap's references onto the workloads that
@@ -499,9 +598,9 @@ func (r *resolver) collapseGenericEdges() {
 	r.edges = kept
 }
 
-func (r *resolver) diag(severity schema.Severity, code, path string, line int, message string) {
+func (r *resolver) diag(severity schema.Severity, code, file string, line int, message string) {
 	r.diags = append(r.diags, schema.Diagnostic{
-		Severity: severity, Code: code, Path: path, Line: line, Message: message,
+		Severity: severity, Code: code, Path: file, Line: line, Message: message,
 	})
 }
 
