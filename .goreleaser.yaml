@@ -79,7 +79,7 @@ nfpms:
     ids: [structura]
     package_name: structura
     vendor: Structura
-    homepage: https://structura.dev/
+    homepage: https://github.com/kamronarabi/structura
     maintainer: Kamron Arabi <kamronarabi@gmail.com>
     description: |-
       Map your architecture from the configs you already have.
@@ -100,7 +100,11 @@ homebrew_casks:
       owner: kamronarabi
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: https://structura.dev/
+    # "auto" skips the tap for prerelease tags. Without it, rehearsing the
+    # pipeline with v0.1.0-rc.1 would leave `brew install` serving a release
+    # candidate to anyone who tried the tap before the real tag landed.
+    skip_upload: auto
+    homepage: https://github.com/kamronarabi/structura
     description: Map your architecture from the configs you already have
     license: Apache-2.0
     commit_author:
