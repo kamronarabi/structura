@@ -40,6 +40,20 @@ allowed:
   # than silently dropped.
   - {from: frontend, to: packagingservice}
 
+  # Google Cloud. Four services declare a GCP SDK as a direct dependency --
+  # productcatalogservice reaches AlloyDB and Secret Manager, and all four run
+  # Cloud Profiler -- so these edges are true and the resolver is right to draw
+  # them. They are here rather than under `edges` because this file's source is
+  # the project's own architecture diagram, which draws the services and not
+  # the platform underneath them. Listing the four by name rather than matching
+  # `* -> gcp` keeps the gate informative: a fifth service acquiring a cloud
+  # dependency is a change to the architecture, and it should surface here and
+  # be read by someone rather than be absorbed by a wildcard.
+  - {from: checkoutservice, to: gcp}
+  - {from: frontend, to: gcp}
+  - {from: productcatalogservice, to: gcp}
+  - {from: shippingservice, to: gcp}
+
   # Tracing. Every instrumented service reads COLLECTOR_SERVICE_ADDR, which is
   # what the source oracle found, and these sat under `edges` for a while on
   # the strength of that -- taking recall to 0.71 and blaming unrendered Helm.
