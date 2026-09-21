@@ -16,6 +16,7 @@ type view struct {
 	outgoing map[string][]schema.Edge
 	incoming map[string][]schema.Edge
 	byName   map[string][]string
+	byPath   map[string][]schema.Diagnostic
 }
 
 func newView(g schema.Graph) *view {
@@ -25,6 +26,12 @@ func newView(g schema.Graph) *view {
 		outgoing: map[string][]schema.Edge{},
 		incoming: map[string][]schema.Edge{},
 		byName:   map[string][]string{},
+		byPath:   map[string][]schema.Diagnostic{},
+	}
+	for _, d := range g.Diagnostics {
+		if d.Path != "" {
+			v.byPath[d.Path] = append(v.byPath[d.Path], d)
+		}
 	}
 	for i := range g.Nodes {
 		n := &g.Nodes[i]
@@ -37,6 +44,45 @@ func newView(g schema.Graph) *view {
 		v.incoming[e.To] = append(v.incoming[e.To], e)
 	}
 	return v
+}
+
+// diagnosticsFor returns what the scan reported about the files a component
+// is declared in.
+//
+// The global diagnostic list is where the reason for an absence lives, but a
+// reader looking at one component has no way to find the entry that concerns
+// it -- they would have to read all of them and correlate by filename. An
+// empty dependency list with an unexplained reference in the same file means
+// something quite different from an empty list with nothing reported, and
+// that difference is the whole question when a component appears to stand
+// alone.
+//
+// Attribution is by file, not by line, so a manifest holding twenty objects
+// attributes its diagnostics to all twenty. Callers say so rather than
+// implying the entry is about this component specifically.
+func (v *view) diagnosticsFor(n *schema.Node) []schema.Diagnostic {
+	seen := map[string]bool{}
+	var out []schema.Diagnostic
+	for _, src := range n.Sources {
+		for _, d := range v.byPath[src.Path] {
+			key := fmt.Sprintf("%s:%d:%s", d.Path, d.Line, d.Code)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, d)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		if out[i].Line != out[j].Line {
+			return out[i].Line < out[j].Line
+		}
+		return out[i].Code < out[j].Code
+	})
+	return out
 }
 
 // resolveRef accepts either a node ID or a name.

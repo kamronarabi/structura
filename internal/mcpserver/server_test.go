@@ -488,3 +488,95 @@ func TestOverviewWarnsWhenTheGraphIsNotASystem(t *testing.T) {
 		t.Errorf("a connected system was reported as a collection:\n%s", out)
 	}
 }
+
+// TestIsolatedComponentExplainsItself covers what a reader concludes from an
+// empty dependency list.
+//
+// A component that stands alone is either genuinely independent or its
+// dependencies live somewhere the scan cannot read. Those mean opposite
+// things, and silence reads as the first.
+func TestIsolatedComponentExplainsItself(t *testing.T) {
+	session, ctx := connect(t, fixture(t, "multi-environment"))
+
+	list, _ := callText(t, session, ctx, "structura_list_nodes", mcpserver.ListNodesArgs{})
+	var checked int
+	for _, line := range strings.Split(list, "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) == 0 || !strings.Contains(fields[0], ":") {
+			continue
+		}
+		// Only components the listing shows with no relationships.
+		if strings.Contains(line, " out, ") {
+			continue
+		}
+		out, isErr := callText(t, session, ctx, "structura_describe_node",
+			mcpserver.DescribeNodeArgs{Node: fields[0]})
+		if isErr {
+			continue
+		}
+		if !strings.Contains(out, "No relationships") {
+			t.Errorf("%s has no relationships and does not say so:\n%s", fields[0], out)
+		}
+		checked++
+	}
+	if checked == 0 {
+		t.Skip("this fixture has no isolated components")
+	}
+}
+
+// TestContainmentDoesNotCountAsARelationship is the regression guard.
+//
+// Every workload now sits inside the namespace that deploys it. Counting
+// that edge would mean no component is ever isolated, and the explanation
+// above would never be reached — while the relationship list, which filters
+// containment out, still showed nothing.
+func TestContainmentDoesNotCountAsARelationship(t *testing.T) {
+	session, ctx := connect(t, fixture(t, "multi-environment"))
+
+	// Every component in this fixture is inside a namespace boundary, and
+	// none of them resolve a dependency.
+	out, isErr := callText(t, session, ctx, "structura_describe_node",
+		mcpserver.DescribeNodeArgs{Node: "api"})
+	if isErr {
+		t.Skipf("api not resolvable in this fixture:\n%s", out)
+	}
+	if !strings.Contains(out, "No relationships") {
+		t.Errorf("a component whose only edge is containment was treated as connected:\n%s", out)
+	}
+}
+
+// TestDescribeNodeSurfacesDiagnosticsForItsFiles puts the reason next to the
+// absence.
+//
+// The global list is where the reason lives, but a reader looking at one
+// component would have to read all of them and correlate by filename.
+func TestDescribeNodeSurfacesDiagnosticsForItsFiles(t *testing.T) {
+	session, ctx := connect(t, fixture(t, "helm-chart"))
+
+	diags, _ := callText(t, session, ctx, "structura_diagnostics", mcpserver.DiagnosticsArgs{})
+	if strings.Contains(diags, "No diagnostics") {
+		t.Skip("this fixture reports nothing")
+	}
+
+	list, _ := callText(t, session, ctx, "structura_list_nodes", mcpserver.ListNodesArgs{})
+	var sawAttribution bool
+	for _, line := range strings.Split(list, "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) == 0 || !strings.Contains(fields[0], ":") {
+			continue
+		}
+		out, isErr := callText(t, session, ctx, "structura_describe_node",
+			mcpserver.DescribeNodeArgs{Node: fields[0]})
+		if !isErr && strings.Contains(out, "Matched by file") {
+			sawAttribution = true
+			// The caveat has to travel with the attribution: a manifest
+			// holding many objects attributes its diagnostics to all of them.
+			if !strings.Contains(out, "another object in the same file") {
+				t.Errorf("%s attributes diagnostics without the caveat:\n%s", fields[0], out)
+			}
+		}
+	}
+	if !sawAttribution {
+		t.Error("no component surfaced a diagnostic for its own files, though the scan reported some")
+	}
+}

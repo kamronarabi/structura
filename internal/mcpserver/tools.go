@@ -249,11 +249,48 @@ func (s *Server) describeNode(ctx context.Context, _ *mcp.CallToolRequest, args 
 	writeEdges(r, v, "Depends on", v.outgoing[id], func(e schema.Edge) string { return e.To })
 	writeEdges(r, v, "Depended on by", v.incoming[id], func(e schema.Edge) string { return e.From })
 
-	if len(v.outgoing[id]) == 0 && len(v.incoming[id]) == 0 {
+	// What the scan reported about this component's own files, next to the
+	// relationships rather than buried in a global list a reader would have
+	// to correlate by filename. An empty dependency list with an unresolved
+	// reference in the same file means something quite different from an
+	// empty list with nothing reported.
+	related := v.diagnosticsFor(n)
+
+	// Containment does not count. Every workload sits inside the namespace
+	// that deploys it, so counting that edge would mean no component is ever
+	// isolated and the explanation below would never be reached.
+	out, in := v.degree(id)
+	isolated := out == 0 && in == 0
+
+	if isolated {
 		r.Headerf("")
-		r.Headerf("No relationships were found for this component. This may mean it")
-		r.Headerf("genuinely has none, or that its dependencies are expressed in source")
-		r.Headerf("code rather than configuration. structura_diagnostics may say which.")
+		if len(related) == 0 {
+			r.Headerf("No relationships, and nothing was reported about the files this")
+			r.Headerf("component is declared in. Either it genuinely depends on nothing,")
+			r.Headerf("or it reaches its dependencies from application code, which a")
+			r.Headerf("configuration scan cannot see.")
+		} else {
+			r.Headerf("No relationships were found. The scan did report problems with the")
+			r.Headerf("files this component is declared in, listed below, which may be why.")
+		}
+	}
+
+	if len(related) > 0 {
+		r.Headerf("")
+		if isolated {
+			r.Headerf("Reported for these files:")
+		} else {
+			r.Headerf("Reported for this component's files, so the picture above may be incomplete:")
+		}
+		for _, d := range related {
+			if !r.Itemf("  [%s] %s at %s\n      %s",
+				d.Severity, d.Code, location(d.Path, d.Line), d.Message) {
+				break
+			}
+		}
+		// Attribution is by file, and a manifest often holds many objects.
+		r.Headerf("")
+		r.Headerf("(Matched by file, so an entry may concern another object in the same file.)")
 	}
 	return textResult(r.String()), nil, nil
 }
