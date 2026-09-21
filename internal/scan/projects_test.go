@@ -65,6 +65,49 @@ spec:
 	return root
 }
 
+// twoDistinctStacks writes two independent projects that share a namespace
+// name and nothing else, which is what separate systems in one repository
+// actually look like: the reused word is an accident, the components are not.
+func twoDistinctStacks(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+
+	services := map[string][]string{
+		"alpha": {"checkout", "orders-db"},
+		"beta":  {"reports", "warehouse-db"},
+	}
+	for stack, names := range services {
+		dir := filepath.Join(root, "samples", stack, "deploy")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		var manifest string
+		for _, name := range names {
+			manifest += `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ` + name + `
+  namespace: prod
+  labels: {app: ` + name + `}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels: {app: ` + name + `}
+    spec:
+      containers:
+        - name: main
+          image: ` + stack + `/` + name + `:1.0
+---
+`
+		}
+		if err := os.WriteFile(filepath.Join(dir, "app.yaml"), []byte(manifest), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
+}
+
 func runProjects(t *testing.T, root string, projects []string) schema.Graph {
 	t.Helper()
 	res, err := scan.Run(context.Background(), extractors.Default(), scan.Options{
@@ -232,5 +275,77 @@ func TestProjectQualificationIsDeterministic(t *testing.T) {
 	if first.ContentHash != second.ContentHash {
 		t.Errorf("content hash depends on the order projects were configured:\n  %s\n  %s",
 			first.ContentHash, second.ContentHash)
+	}
+}
+
+// The boundary machinery only helps people who know they need it, so the scan
+// has to say so. Nothing about the graph changes; the warning is the whole
+// feature.
+func TestUndeclaredProjectsAreReported(t *testing.T) {
+	g := runProjects(t, twoDistinctStacks(t), nil)
+
+	var found []schema.Diagnostic
+	for _, d := range g.Diagnostics {
+		if d.Code == "undeclared_projects" {
+			found = append(found, d)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("undeclared_projects diagnostics = %d, want 1: %+v", len(found), g.Diagnostics)
+	}
+	if found[0].Severity != schema.SeverityWarn {
+		t.Errorf("Severity = %q, want warn: a merged pair of systems is material", found[0].Severity)
+	}
+	for _, want := range []string{"samples/alpha", "samples/beta", "projects:", ".structura.yaml"} {
+		if !strings.Contains(found[0].Message, want) {
+			t.Errorf("message does not mention %q: %s", want, found[0].Message)
+		}
+	}
+}
+
+// Once declared, the question is answered and must not be asked again.
+func TestDeclaredProjectsSilenceTheWarning(t *testing.T) {
+	g := runProjects(t, twoDistinctStacks(t), []string{"samples/alpha", "samples/beta"})
+
+	for _, d := range g.Diagnostics {
+		if d.Code == "undeclared_projects" {
+			t.Errorf("still warning after the projects were declared: %s", d.Message)
+		}
+	}
+}
+
+// The warning is advisory. Declaring nothing must leave the graph exactly as
+// it was, or this stops being a warning and becomes a silent behaviour change.
+func TestWarningDoesNotChangeTheGraph(t *testing.T) {
+	g := runProjects(t, twoDistinctStacks(t), nil)
+
+	for _, n := range g.Nodes {
+		if _, ok := n.Attrs["project"]; ok {
+			t.Errorf("node %s was assigned a project by a warning", n.ID)
+		}
+	}
+	if got := namesOf(g, schema.KindBoundary); len(got) != 1 {
+		t.Errorf("boundaries = %v, want the one merged boundary: the warning must not split anything", got)
+	}
+}
+
+// The limit of the warning, pinned so it is a known cost rather than a
+// surprise.
+//
+// Two projects whose components are named identically are indistinguishable
+// from one project's base and overlay: both are two trees declaring the same
+// components. Nothing in the file tree separates them, so the scan stays
+// quiet and merges them, exactly as it did before any of this existed.
+//
+// This is the failure the warning cannot catch, and it is also the case where
+// the merge does most damage. Declaring the projects is the only fix.
+func TestIdenticallyNamedStacksAreNotDetected(t *testing.T) {
+	g := runProjects(t, twoStacks(t), nil)
+
+	for _, d := range g.Diagnostics {
+		if d.Code == "undeclared_projects" {
+			t.Errorf("the heuristic changed and now catches identical stacks; "+
+				"update the comment on sharesRealComponent: %s", d.Message)
+		}
 	}
 }

@@ -148,6 +148,10 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 	mergedNodes, mergeDiags := merge.Nodes()
 	diags = append(diags, mergeDiags...)
 
+	// What the scan never opened is as much a gap as what it failed to parse,
+	// and silence about it reads as completeness.
+	diags = append(diags, unsupportedDiagnostics(walkRes.Unsupported)...)
+
 	// Edges declared by extractors are collected separately from the merged
 	// node set, because the resolver may rewrite their endpoints when it
 	// discovers that two nodes are one component.
@@ -155,6 +159,11 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 	for _, out := range outputs {
 		declaredEdges = append(declaredEdges, out.Edges...)
 	}
+
+	// Asked of the merged set rather than the resolved one: what this looks
+	// for is two files that produced the same identifier, and resolution
+	// deliberately merges nodes that did not.
+	diags = append(diags, undeclaredProjectDiagnostics(mergedNodes, projects)...)
 
 	// RESOLVE: match unresolved references against the finished node set.
 	resolved := resolve.Resolve(resolve.Input{
@@ -399,4 +408,29 @@ func qualifyByProject(outputs []FileOutput, projects *project.Set) {
 			out.Aliases[j].Project = root
 		}
 	}
+}
+
+// undeclaredProjectDiagnostics reports trees that look like separate projects
+// and are not declared as any.
+//
+// This changes nothing about the graph. It is the one place the scan says "I
+// may have merged two systems", and it exists because the alternative -- a
+// silently merged graph and a person who never learns the configuration key
+// exists -- is how the collision went unnoticed in the first place.
+func undeclaredProjectDiagnostics(nodes []schema.Node, set *project.Set) []schema.Diagnostic {
+	suspects := project.Suspects(nodes, set)
+	out := make([]schema.Diagnostic, 0, len(suspects))
+	for _, s := range suspects {
+		out = append(out, schema.Diagnostic{
+			Severity: schema.SeverityWarn,
+			Code:     "undeclared_projects",
+			Message: fmt.Sprintf(
+				"%s and %s both declare %s, and share no other component, which is what two "+
+					"independent projects look like. Their components are currently merged as "+
+					"though they were one system. If they are separate, list them under "+
+					"\"projects:\" in .structura.yaml; if they are one, nothing needs doing",
+				s.Trees[0], s.Trees[1], list(s.Shared)),
+		})
+	}
+	return out
 }

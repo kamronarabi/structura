@@ -47,6 +47,12 @@ type WalkResult struct {
 	Files []FileMeta
 	// Scanned counts every file the walker considered, ignored or not.
 	Scanned int
+	// Unsupported are files no extractor claimed but whose name says they
+	// describe architecture: a Dockerfile, a Fly configuration. They are kept
+	// so the scan can report what it did not read, and only these are kept --
+	// retaining every unmatched file would mean holding most of the
+	// repository in memory to say something nobody needs said.
+	Unsupported []FileMeta
 	// Diagnostics report what the walk had to skip.
 	Diagnostics []schema.Diagnostic
 }
@@ -91,7 +97,13 @@ func Walk(ctx context.Context, root string, reg *Registry, opts WalkOptions) (Wa
 			newest = f.ModTime
 		}
 	}
-	return WalkResult{Files: w.files, Scanned: w.scanned, Newest: newest, Diagnostics: w.diags}, nil
+	return WalkResult{
+		Files:       w.files,
+		Scanned:     w.scanned,
+		Unsupported: w.unsupported,
+		Newest:      newest,
+		Diagnostics: w.diags,
+	}, nil
 }
 
 type walker struct {
@@ -100,9 +112,10 @@ type walker struct {
 	maxSize  int64
 	follow   bool
 
-	files   []FileMeta
-	scanned int
-	diags   []schema.Diagnostic
+	files       []FileMeta
+	scanned     int
+	unsupported []FileMeta
+	diags       []schema.Diagnostic
 }
 
 // ignoreFileNames are read at every directory, lowest precedence first.
@@ -222,6 +235,9 @@ func (w *walker) consider(entry fs.DirEntry, relPath string) {
 
 	meta := newFileMeta(relPath, size, modTime)
 	if len(w.registry.MatchAll(meta)) == 0 {
+		if _, ok := matchUnsupported(meta); ok {
+			w.unsupported = append(w.unsupported, meta)
+		}
 		return
 	}
 	// The size check runs after matching so that the diagnostic is only

@@ -69,8 +69,15 @@ func (s *Server) overview(ctx context.Context, _ *mcp.CallToolRequest, _ Overvie
 		}
 	}
 	r.Headerf("%s", name)
-	r.Headerf("%d components, %d relationships, from %d files",
-		len(g.Nodes), countRelationships(g), g.Stats.FilesParsed)
+	// Both numbers, not just the one that flatters the scan. "from 2 files"
+	// on a repository of five reads as a complete reading of a small tree;
+	// "from 2 of 5 files" is the same fact and prompts the right question.
+	files := fmt.Sprintf("%d files", g.Stats.FilesParsed)
+	if g.Stats.FilesScanned > g.Stats.FilesParsed {
+		files = fmt.Sprintf("%d of %d files", g.Stats.FilesParsed, g.Stats.FilesScanned)
+	}
+	r.Headerf("%d components, %d relationships, from %s",
+		len(g.Nodes), countRelationships(g), files)
 	if note := shapeNote(g); note != "" {
 		r.Headerf("")
 		r.Headerf("%s", note)
@@ -80,6 +87,20 @@ func (s *Server) overview(ctx context.Context, _ *mcp.CallToolRequest, _ Overvie
 		r.Headerf("")
 		r.Headerf("No components were found. structura_diagnostics explains why.")
 		return textResult(r.String()), nil, nil
+	}
+
+	// A repository holding several independent projects is not one system,
+	// and a reader given a single component count will treat it as one --
+	// tracing paths between stacks that have never heard of each other. The
+	// count is the first thing to say, before any of the totals above are
+	// interpreted.
+	if projects := projectCounts(g); len(projects) > 1 {
+		r.Headerf("")
+		r.Headerf("This repository holds %d separate projects. Components in different", len(projects))
+		r.Headerf("projects are unrelated, and no relationship is drawn between them:")
+		for _, p := range projects {
+			r.Headerf("  %-40s %d components", p.name, p.count)
+		}
 	}
 
 	counts := map[schema.NodeKind]int{}
@@ -478,7 +499,20 @@ func (s *Server) diagnostics(ctx context.Context, _ *mcp.CallToolRequest, args D
 
 	r := NewResponse(budgetDiagnostics)
 	if len(matched) == 0 {
-		r.Headerf("No diagnostics. Everything this scan recognized, it parsed.")
+		// "No diagnostics" is read as "nothing is missing", and the two are
+		// not the same thing. What this scan recognized, it parsed; what it
+		// does not recognize it never mentions, and neither does it read
+		// application code at all.
+		if args.Code != "" || args.Severity != "" {
+			r.Headerf("No diagnostics match that filter. Call structura_diagnostics with no arguments for all of them.")
+			return textResult(r.String()), nil, nil
+		}
+		r.Headerf("No gaps to report: everything this scan recognized, it parsed.")
+		r.Headerf("")
+		r.Headerf("That is not the same as nothing being missing. Structura reads")
+		r.Headerf("configuration, not application code, so a dependency that exists only")
+		r.Headerf("in source -- a client built at runtime, a URL assembled from parts --")
+		r.Headerf("is not in this graph and is not counted here.")
 		return textResult(r.String()), nil, nil
 	}
 	r.Headerf("%d %s. Each one is a part of the architecture that may be missing from the graph.",
@@ -849,4 +883,36 @@ func countComponents(g schema.Graph) int {
 		}
 	}
 	return n
+}
+
+// projectCount is one project's share of a graph.
+type projectCount struct {
+	name  string
+	count int
+}
+
+// projectCounts groups a graph's components by the project they belong to,
+// largest first. A single-project repository returns one entry, which callers
+// use to stay silent: saying "1 project" to every reader is noise.
+func projectCounts(g schema.Graph) []projectCount {
+	counts := map[string]int{}
+	for _, n := range g.Nodes {
+		name, _ := n.Attrs["project"].(string)
+		if name == "" {
+			name = "."
+		}
+		counts[name]++
+	}
+
+	out := make([]projectCount, 0, len(counts))
+	for name, count := range counts {
+		out = append(out, projectCount{name: name, count: count})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].count != out[j].count {
+			return out[i].count > out[j].count
+		}
+		return out[i].name < out[j].name
+	})
+	return out
 }
