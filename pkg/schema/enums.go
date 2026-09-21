@@ -108,6 +108,26 @@ func (s Severity) Valid() bool { return severities[s] }
 // Confidence values for the evidence sources the resolver knows about.
 // They are constants rather than magic numbers at each call site so that
 // recalibrating the resolver is a single-file change.
+//
+// # What these numbers are, and what they are not
+//
+// They are hand-set priors: an ordering of how much each kind of evidence
+// ought to be worth, chosen by judgement. They are not measured frequencies,
+// and 0.80 does not mean four in five such edges have been observed correct.
+// Two decimal places invite the second reading, so it is worth saying which
+// one is true.
+//
+// The corpus test reports precision per rule, which is the counting that
+// would tell them apart. On the repositories scored so far it cannot: every
+// rule comes out at 1.00, across too few edges to establish a rate, so the
+// ordering below is neither confirmed nor contradicted by evidence. What the
+// report does do is attribute a wrong edge to the rule that produced it the
+// moment one appears, which is when recalibration would have something to go
+// on.
+//
+// A consumer should read a confidence as a class -- declared, resolved,
+// matched, inferred -- and read the evidence for the specifics. The number
+// ranks; it does not quantify.
 const (
 	// ConfDeclared is an explicit statement in a config file, such as a
 	// Compose depends_on. There is nothing to infer.

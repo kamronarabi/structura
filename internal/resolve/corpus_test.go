@@ -78,6 +78,7 @@ func TestResolverPrecisionOnCorpus(t *testing.T) {
 	report.WriteString(strings.Repeat("-", 92) + "\n")
 
 	var failures []string
+	perRule := map[string]*ruleScore{}
 	for _, file := range files {
 		data, err := os.ReadFile(file)
 		if err != nil {
@@ -95,6 +96,13 @@ func TestResolverPrecisionOnCorpus(t *testing.T) {
 		}
 
 		score := scoreRepo(t, root, want)
+		for name, rs := range score.byRule {
+			if perRule[name] == nil {
+				perRule[name] = &ruleScore{}
+			}
+			perRule[name].found += rs.found
+			perRule[name].wrong += rs.wrong
+		}
 		fmt.Fprintf(&report, "%-22s %-11.2f %-11.2f %d found, %d wrong, %d missed\n",
 			want.Repo, score.precision, score.recall,
 			score.found, len(score.falsePositives), len(score.missed))
@@ -113,9 +121,38 @@ func TestResolverPrecisionOnCorpus(t *testing.T) {
 		}
 	}
 
+	writeRuleReport(&report, perRule)
 	t.Log(report.String())
 	for _, f := range failures {
 		t.Error(f)
+	}
+}
+
+// writeRuleReport prints what each rule's edges were worth, next to the
+// confidence its edges carry.
+//
+// Those constants are the project's central claim: an edge says how much it
+// should be believed. But they are hand-set priors, and a prior presented
+// with two decimal places reads as a measured frequency. This is the counting
+// that would tell them apart. It is reported rather than gated, because a
+// handful of repositories cannot establish a rate -- what it can do is
+// attribute a wrong edge to the rule that produced it the moment one appears.
+func writeRuleReport(report *strings.Builder, perRule map[string]*ruleScore) {
+	if len(perRule) == 0 {
+		return
+	}
+	names := make([]string, 0, len(perRule))
+	for n := range perRule {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+
+	report.WriteString("\nPER-RULE (all repositories)\n")
+	fmt.Fprintf(report, "  %-28s %-9s %-7s %s\n", "RULE", "PRECISION", "EDGES", "WRONG")
+	report.WriteString("  " + strings.Repeat("-", 60) + "\n")
+	for _, n := range names {
+		r := perRule[n]
+		fmt.Fprintf(report, "  %-28s %-9.2f %-7d %d\n", n, r.precision(), r.found, r.wrong)
 	}
 }
 
@@ -124,6 +161,20 @@ type score struct {
 	found             int
 	falsePositives    []string
 	missed            []string
+	// byRule attributes each found edge to the rules that produced it, so a
+	// wrong edge names the rule to fix. It is also the only way to check the
+	// confidence constants against anything: each is a claim about how often
+	// its rule is right, and until now nothing counted.
+	byRule map[string]*ruleScore
+}
+
+type ruleScore struct{ found, wrong int }
+
+func (r *ruleScore) precision() float64 {
+	if r.found == 0 {
+		return 1
+	}
+	return float64(r.found-r.wrong) / float64(r.found)
 }
 
 func scoreRepo(t *testing.T, root string, want expectation) score {
@@ -142,15 +193,30 @@ func scoreRepo(t *testing.T, root string, want expectation) score {
 	// Containment is structure, not a relationship anyone would draw.
 	type found struct{ from, to string }
 	seen := map[found]bool{}
+	rules := map[found]map[string]bool{}
 	for _, e := range res.Graph.Edges {
 		if e.Kind == schema.EdgeContains {
 			continue
 		}
-		seen[found{names[e.From], names[e.To]}] = true
+		f := found{names[e.From], names[e.To]}
+		seen[f] = true
+		if rules[f] == nil {
+			rules[f] = map[string]bool{}
+		}
+		for _, ev := range e.Evidence {
+			rules[f][ev.Rule] = true
+		}
 	}
 
 	var s score
 	s.found = len(seen)
+	s.byRule = map[string]*ruleScore{}
+	rule := func(name string) *ruleScore {
+		if s.byRule[name] == nil {
+			s.byRule[name] = &ruleScore{}
+		}
+		return s.byRule[name]
+	}
 
 	matchedExpected := map[string]bool{}
 	for f := range seen {
@@ -160,6 +226,9 @@ func scoreRepo(t *testing.T, root string, want expectation) score {
 				isExpected = true
 				matchedExpected[want.String()] = true
 			}
+		}
+		for r := range rules[f] {
+			rule(r).found++
 		}
 		if isExpected {
 			continue
@@ -173,6 +242,9 @@ func scoreRepo(t *testing.T, root string, want expectation) score {
 		}
 		if !isAllowed {
 			s.falsePositives = append(s.falsePositives, f.from+" -> "+f.to)
+			for r := range rules[f] {
+				rule(r).wrong++
+			}
 		}
 	}
 

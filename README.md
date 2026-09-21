@@ -112,6 +112,14 @@ Shipping imperfect inference is fine. Shipping imperfect inference that
 presents itself as certain is not — especially when a model is about to reason
 on top of it.
 
+The score itself is a hand-set prior, not a measured frequency: `0.80` ranks
+this kind of evidence below a declared dependency, it does not claim that four
+in five such edges have been observed correct. `make corpus-test` reports
+precision per rule, which is the counting that would tell those apart — on the
+repositories scored so far every rule comes out at 1.00, across too few edges
+to establish a rate. Read the number as a class and the evidence for the
+specifics.
+
 ## Credentials never reach the graph
 
 `graph.json` gets committed to repos and pasted into LLM context, so anything

@@ -746,3 +746,66 @@ func TestBuildContextJoinStillWins(t *testing.T) {
 		t.Error("a declared build context was reported as an inference")
 	}
 }
+
+// An edge whose name matched one component and an edge whose name matched
+// several must not carry the same number.
+//
+// The second required a judgement the first did not, and scoring them alike
+// asserts a certainty that was not there. The rule name has always recorded
+// the difference by appending "+scoped"; the confidence did not, so a reader
+// comparing two 0.80 edges had no way to tell which one had been
+// disambiguated -- and the number is the part a model actually reads.
+func TestADisambiguatedMatchScoresBelowAnUnambiguousOne(t *testing.T) {
+	// One component answers to the name, so nothing has to be decided.
+	unambiguous := func() float64 {
+		b := &builder{}
+		b.node(schema.KindDatastore, "compose", "shop", "cache", nil)
+		api := b.node(schema.KindService, "compose", "shop", "api", nil)
+		b.hint(resolve.Hint{
+			FromNode: api, Kind: resolve.HintConnString,
+			Raw:    "redis://cache:6379/0",
+			Tokens: []string{"cache"}, SuggestedEdge: schema.EdgePersistsTo,
+		})
+		r := b.run()
+		if len(r.Edges) != 1 {
+			t.Fatalf("want one edge from the unambiguous case, got %v", r.edgeList())
+		}
+		return r.Edges[0].Confidence
+	}()
+
+	// Two components answer to it, in the same project and namespace, so the
+	// locality gate cannot separate them. What decides is the kind the
+	// reference implies: a redis:// URL means the datastore. Correct, and a
+	// decision nonetheless.
+	b := &builder{}
+	store := b.node(schema.KindDatastore, "compose", "shop", "cache", nil)
+	b.node(schema.KindService, "compose", "shop", "cache", nil)
+	api := b.node(schema.KindService, "compose", "shop", "api", nil)
+	b.hint(resolve.Hint{
+		FromNode: api, Kind: resolve.HintConnString,
+		Raw:    "redis://cache:6379/0",
+		Tokens: []string{"cache"}, SuggestedEdge: schema.EdgePersistsTo,
+	})
+
+	r := b.run()
+	if len(r.Edges) != 1 {
+		t.Fatalf("want one edge from the ambiguous case, got %v", r.edgeList())
+	}
+	edge := r.Edges[0]
+	if edge.To != store {
+		t.Fatalf("resolved to %q, want the datastore %q", edge.To, store)
+	}
+	if rule := edge.Evidence[0].Rule; !strings.Contains(rule, "+scoped") {
+		t.Fatalf("rule %q does not record that the match was decided rather than "+
+			"found; the fixture is not exercising the tie-break", rule)
+	}
+	if edge.Confidence >= unambiguous {
+		t.Errorf("a disambiguated match scored %.2f, the same as or above the "+
+			"unambiguous %.2f", edge.Confidence, unambiguous)
+	}
+	// One step, not a tier: it is still the same rule's finding.
+	if diff := unambiguous - edge.Confidence; diff > 0.11 {
+		t.Errorf("the penalty is %.2f, which demotes the edge past a whole "+
+			"confidence tier rather than one step", diff)
+	}
+}

@@ -85,10 +85,28 @@ func (idx *Index) decide(byRule []ruleCandidates, h Hint, from *Identity) (Match
 		return Match{NodeID: rc.ids[0], Rule: rc.rule.name, Confidence: confidence}, true
 	}
 	if narrowed := idx.tieBreak(rc.ids, h, from); len(narrowed) == 1 {
-		return Match{NodeID: narrowed[0], Rule: rc.rule.name + "+scoped", Confidence: confidence}, true
+		// Scored below an unambiguous hit. Several components answered to
+		// this name and scope picked the winner -- usually correctly, which
+		// is why the tie-break exists, but it is a judgement the single-match
+		// case did not have to make, and scoring the two the same asserts a
+		// certainty that was not there. The rule name already records it;
+		// the number should agree.
+		return Match{
+			NodeID:     narrowed[0],
+			Rule:       rc.rule.name + "+scoped",
+			Confidence: confidence - scopedPenalty,
+		}, true
 	}
 	return Match{Rule: rc.rule.name, Candidates: rc.ids}, false
 }
+
+// scopedPenalty is what a resolution costs when the name was ambiguous and
+// scope decided it.
+//
+// One step, not a tier: the edge is still the same rule's finding, and the
+// tie-break is right far more often than not. It exists so that a reader
+// comparing two 0.80 edges can tell which one had to be disambiguated.
+const scopedPenalty = 0.05
 
 // matchRule is one rung of the precedence ladder, in descending order of how
 // much a hit is worth.
