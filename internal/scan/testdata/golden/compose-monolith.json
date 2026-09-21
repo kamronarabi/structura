@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "0.2.0",
+  "schemaVersion": "0.3.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:4d140c8282ddc1af332904d100333d1a3005302727965b7c070d980c8ca23973",
+  "contentHash": "sha256:2560405c13398485ceee529dfbcc806fd44994d8a39f5173cd7af9c2d2073bc5",
   "root": {
     "name": "compose-monolith"
   },

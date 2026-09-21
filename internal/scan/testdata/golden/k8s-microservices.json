@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "0.2.0",
+  "schemaVersion": "0.3.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:b2680c4f29790034bd9d589c93b6b732d91db6f6df48dd95d5bd7ba8d0c4098f",
+  "contentHash": "sha256:07fc8fa2297e0bc088129e2b912cbd58056640e41a6c3d8dc9549416e1aed699",
   "root": {
     "name": "k8s-microservices"
   },

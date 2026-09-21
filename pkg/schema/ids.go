@@ -303,3 +303,44 @@ func validateRelPath(p string) error {
 	}
 	return nil
 }
+
+// QualifyNamespace prefixes a node ID's namespace segment, returning the new
+// ID with every other segment preserved exactly.
+//
+// This is how a repository that holds more than one project keeps their
+// components apart. Two independent stacks each declaring a "prod" namespace
+// produce the same ID for different things, and the graph merges them into
+// one node that claims to contain both: a boundary that really does exist
+// twice, drawn once, with members from two systems inside it. Prefixing the
+// namespace with the project is enough to separate them, and it leaves the ID
+// grammar alone -- the shape is unchanged, only the value differs, so a
+// reader built for any schema version still parses it.
+//
+// The name segment is copied verbatim rather than rebuilt, because rebuilding
+// would fold an already-folded name a second time and could append a second
+// discriminator to a name that already carries one.
+func QualifyNamespace(id, prefix string) (string, error) {
+	if prefix == "" {
+		return id, nil
+	}
+	colon := strings.Index(id, idSeparator)
+	if colon <= 0 {
+		return "", fmt.Errorf("%w: %q has no kind", ErrInvalidNodeID, id)
+	}
+	kind, rest := id[:colon], id[colon+1:]
+
+	source, rest, ok := strings.Cut(rest, "/")
+	if !ok {
+		return "", fmt.Errorf("%w: %q has no namespace", ErrInvalidNodeID, id)
+	}
+	namespace, name, ok := strings.Cut(rest, "/")
+	if !ok {
+		return "", fmt.Errorf("%w: %q has no name", ErrInvalidNodeID, id)
+	}
+	if namespace == "" || name == "" {
+		return "", fmt.Errorf("%w: %q has an empty segment", ErrInvalidNodeID, id)
+	}
+
+	return kind + idSeparator + source + "/" +
+		slugSegment(prefix+"-"+namespace) + "/" + name, nil
+}

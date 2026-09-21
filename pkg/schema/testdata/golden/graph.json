@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "0.2.0",
+  "schemaVersion": "0.3.0",
   "generatedAt": "2026-09-20T14:22:31Z",
-  "contentHash": "sha256:e4307ac64078801bc0f9015c43e8a9c0da334ae6af961bad63f0722812a5750b",
+  "contentHash": "sha256:6aee74d549e1e8a280a3c9bd8c474024da81b9db07ccf46e4cef9d9b05f1f1a4",
   "root": {
     "name": "acme",
     "vcs": {

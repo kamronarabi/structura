@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "0.2.0",
+  "schemaVersion": "0.3.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:be03fdb9759469a79c818d80ae142e061a28b42b578b211dbd69addce3805755",
+  "contentHash": "sha256:af0db3db3da95bf79aa9ab81d35c410ff27c4fd8ff29af41ac8d6cb212a41524",
   "root": {
     "name": "helm-chart"
   },

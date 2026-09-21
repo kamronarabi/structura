@@ -59,7 +59,7 @@ import (
 // avoid. Phase 2 adds what Phase 2 turns out to need, and bumps the minor
 // when it does -- to whatever the next minor is by then, which is why no
 // number is written down here.
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 // Relation describes how one schema version stands to another.
 type Relation string

@@ -1,0 +1,19 @@
+# Structura's own repository is not one system.
+#
+# testdata/golden holds seven independent sample repositories, each scanned in
+# isolation by the golden tests. Scanned together -- which is what happens when
+# Structura is pointed at its own checkout -- they share a namespace called
+# "prod" and directories called "web" and "worker", and without a boundary the
+# scan merges components that belong to different stacks.
+#
+# Nothing in the file tree distinguishes sibling projects from sibling parts of
+# one project, so this is written down rather than inferred. See
+# internal/project.
+projects:
+  - testdata/golden/compose-monolith
+  - testdata/golden/helm-chart
+  - testdata/golden/k8s-microservices
+  - testdata/golden/multi-environment
+  - testdata/golden/polyglot-monorepo
+  - testdata/golden/react-supabase
+  - testdata/golden/terraform-serverless

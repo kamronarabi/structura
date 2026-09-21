@@ -22,6 +22,12 @@ import (
 type Options struct {
 	Root    string // repository root to operate on
 	Verbose bool
+
+	// Projects are the directories that hold independent projects, read from
+	// the config file's "projects" key. Empty -- the usual case -- means the
+	// repository is one project. See internal/project for why this is
+	// declared rather than detected.
+	Projects []string
 }
 
 const (
@@ -118,6 +124,10 @@ func initConfig(cmd *cobra.Command, opts *Options, cfgFile string) error {
 	if !cmd.Flags().Changed("verbose") && v.IsSet("verbose") {
 		opts.Verbose = v.GetBool("verbose")
 	}
+	// Projects have no flag: a repository's boundaries are a property of the
+	// repository, not of one invocation, so they belong in the file that is
+	// committed alongside it.
+	opts.Projects = v.GetStringSlice("projects")
 	return nil
 }
 

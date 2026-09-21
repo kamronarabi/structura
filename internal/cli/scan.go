@@ -65,6 +65,7 @@ func runScan(cmd *cobra.Command, opts *Options, f *scanFlags) error {
 		DisableDefaultIgnores: f.noDefaultIgnores,
 		Concurrency:           f.concurrency,
 		KeepIntermediate:      f.debugDump,
+		Projects:              opts.Projects,
 	})
 	if err != nil {
 		return err

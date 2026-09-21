@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/kamronarabi/structura/internal/buildinfo"
+	"github.com/kamronarabi/structura/internal/project"
 	"github.com/kamronarabi/structura/internal/resolve"
 	"github.com/kamronarabi/structura/pkg/schema"
 )
@@ -27,6 +29,11 @@ type Options struct {
 
 	// Concurrency bounds the extraction stage. Zero means GOMAXPROCS.
 	Concurrency int
+
+	// Projects names the directories that hold independent projects, for a
+	// repository whose boundaries detection cannot see. Empty means detect,
+	// and detection defaults to treating the repository as one project.
+	Projects []string
 
 	// KeepIntermediate retains the pre-resolution output for --debug-dump.
 	// It is off by default because it holds every hint in memory, including
@@ -104,6 +111,16 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 		return Result{}, err
 	}
 
+	// PROJECTS: decide where one project ends and the next begins, before
+	// anything is merged. A repository is one project unless something says
+	// otherwise, and in that case nothing below this line changes -- the
+	// identifiers, and therefore every stored graph, stay exactly as they
+	// were.
+	projects := project.Discover(opts.Projects)
+	if projects.Len() > 1 {
+		qualifyByProject(outputs, projects)
+	}
+
 	// MERGE: fold the per-file buffers together, single-threaded and in the
 	// walker's sorted path order, so the result does not depend on which
 	// worker finished first.
@@ -148,6 +165,9 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 	})
 	diags = append(diags, resolved.Diagnostics...)
 
+	// Detection cannot split a repository safely, but it can ask. Without
+	// this the boundary machinery only helps people who already knew they
+	// needed it.
 	builder := schema.NewBuilder()
 	for _, n := range resolved.Nodes {
 		builder.AddNode(n)
@@ -302,3 +322,81 @@ func (c *collector) Edge(e schema.Edge)       { c.out.Edges = append(c.out.Edges
 func (c *collector) Hint(h resolve.Hint)      { c.out.Hints = append(c.out.Hints, h) }
 func (c *collector) Alias(a resolve.Alias)    { c.out.Aliases = append(c.out.Aliases, a) }
 func (c *collector) Diag(d schema.Diagnostic) { c.out.Diagnostics = append(c.out.Diagnostics, d) }
+
+// qualifyByProject rewrites one project's identifiers so that they cannot
+// collide with another's.
+//
+// Two independent stacks in one repository routinely declare the same
+// namespace -- "prod" is not a distinctive word -- and the node ID has no
+// segment that records which stack a component came from. The result is a
+// single node claiming members from both, and no diagnostic, because as far
+// as the builder is concerned two files simply described the same thing.
+//
+// Rewriting is safe to do per file because an extractor sees one file and
+// nothing else: every identifier in a file's output was computed from that
+// file, so qualifying the whole output at once keeps it internally
+// consistent. References that reach across files -- a pod naming a ConfigMap
+// declared elsewhere -- are qualified by the same rule from the same project,
+// so the two halves still meet.
+//
+// Only the ID is qualified. Node.Namespace keeps the namespace the manifest
+// actually declared, because that is what a reader is shown and what another
+// file writes when it refers to the node; the project is a separate dimension
+// and is recorded separately.
+//
+// The repository-root project is never qualified. A repository with one
+// project must produce byte-identical output to one scanned before this
+// existed.
+func qualifyByProject(outputs []FileOutput, projects *project.Set) {
+	for i := range outputs {
+		out := &outputs[i]
+		root := projects.Of(out.Path)
+		label := project.Label(root)
+		if label == "" {
+			continue
+		}
+
+		for j := range out.Nodes {
+			n := &out.Nodes[j]
+			if id, err := schema.QualifyNamespace(n.ID, label); err == nil {
+				n.ID = id
+			}
+			if n.Attrs == nil {
+				n.Attrs = schema.Attrs{}
+			}
+			n.Attrs["project"] = root
+		}
+		for j := range out.Edges {
+			e := &out.Edges[j]
+			if id, err := schema.QualifyNamespace(e.From, label); err == nil {
+				e.From = id
+			}
+			if id, err := schema.QualifyNamespace(e.To, label); err == nil {
+				e.To = id
+			}
+		}
+		for j := range out.Hints {
+			h := &out.Hints[j]
+			if h.FromNode != "" {
+				if id, err := schema.QualifyNamespace(h.FromNode, label); err == nil {
+					h.FromNode = id
+				}
+			}
+			// A ConfigMap reference travels in Raw as a node ID, and has to
+			// be qualified the same way or the pod and the ConfigMap stop
+			// meeting.
+			if strings.HasPrefix(h.Raw, "configmap:") {
+				if id, err := schema.QualifyNamespace(h.Raw, label); err == nil {
+					h.Raw = id
+				}
+			}
+		}
+		for j := range out.Aliases {
+			// An alias is matched against nodes, so it has to know which
+			// project's nodes it may match. Its namespace is left alone: a
+			// namespace is a namespace in any project, and conflating the two
+			// is what this change exists to stop.
+			out.Aliases[j].Project = root
+		}
+	}
+}

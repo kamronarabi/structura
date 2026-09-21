@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "0.2.0",
+  "schemaVersion": "0.3.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:2569b6d83ad584e9859771b93dfa06554669cf07ef78d499834ffd6b3c922fba",
+  "contentHash": "sha256:53f311f671ec1d5e50a18dd4d1eda6c5b09e17f6c55d3ff721b813e631db8b78",
   "root": {
     "name": "multi-environment"
   },
