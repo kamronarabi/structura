@@ -34,9 +34,11 @@ type Result struct {
 //
 // The order below matters. Aliases run first because they are what makes a
 // Service name resolvable at all; node merging runs next so that references
-// land on one component rather than two halves of one; ConfigMap indirection
-// runs before matching so that values reached through a mount are available;
-// and matching runs last, over a complete picture.
+// land on one component rather than two halves of one; directory-owned hints
+// bind after merging, so that a .env file attaches to the component that
+// survived it; ConfigMap indirection runs before matching so that values
+// reached through a mount are available; and matching runs last, over a
+// complete picture.
 func Resolve(in Input) Result {
 	r := &resolver{
 		index:  NewIndex(in.Nodes),
@@ -52,7 +54,8 @@ func Resolve(in Input) Result {
 	r.applyAliases(in.Aliases)
 	r.mergeCodeIntoDeployments()
 
-	hints := r.expandConfigMaps(in.Hints)
+	hints := r.bindDirectoryHints(in.Hints)
+	hints = r.expandConfigMaps(hints)
 	r.matchHints(hints)
 
 	r.applyMerges()
@@ -335,6 +338,124 @@ func (r *resolver) expandConfigMaps(hints []Hint) []Hint {
 		}
 	}
 	return direct
+}
+
+// bindDirectoryHints attaches hints carried by a file that is not a component
+// to the component whose directory it sits in.
+//
+// A .env file is the case this exists for. It states what a service talks to
+// without naming the service, because the service is implied by where the
+// file is. The extractor cannot resolve that — it sees one file — so it
+// records the directory and leaves the binding until the node set is
+// complete.
+//
+// Attaching to the wrong owner would be worse than not attaching at all: the
+// dependencies of one service would appear on another. So a directory that
+// holds no component, or more than one, produces a diagnostic and no edge.
+func (r *resolver) bindDirectoryHints(hints []Hint) []Hint {
+	out := make([]Hint, 0, len(hints))
+	// One diagnostic per file, not per variable: a .env file with six
+	// references in an unowned directory has one problem, not six.
+	reported := map[string]bool{}
+	// Indexed once rather than per hint: a monorepo with a .env file beside
+	// every service would otherwise walk the whole node set for each variable
+	// in each of them.
+	byBuildContext := r.buildContextIndex()
+	owned := map[string][]string{}
+
+	for _, h := range hints {
+		if h.FromNode != "" || h.OwnerDir == "" {
+			out = append(out, h)
+			continue
+		}
+
+		dir := normalizeDir(h.OwnerDir)
+		owners, cached := owned[dir]
+		if !cached {
+			owners = r.componentsOwning(dir, byBuildContext)
+			owned[dir] = owners
+		}
+		switch len(owners) {
+		case 1:
+			h.FromNode = owners[0]
+			out = append(out, h)
+		case 0:
+			if !reported[h.Source.Path] {
+				reported[h.Source.Path] = true
+				r.diag(schema.SeverityInfo, "env_file_unowned", h.Source.Path, 0,
+					fmt.Sprintf("no component is declared in %q, so the references in this file "+
+						"were not attached to anything; a manifest or an image in that directory "+
+						"is what identifies the service they belong to", h.OwnerDir))
+			}
+		default:
+			if !reported[h.Source.Path] {
+				reported[h.Source.Path] = true
+				r.diag(schema.SeverityWarn, "env_file_ambiguous_owner", h.Source.Path, 0,
+					fmt.Sprintf("%d components are declared in %q (%s), so there is no single "+
+						"service these references belong to and none were attached",
+						len(owners), h.OwnerDir, strings.Join(r.displayNames(owners), ", ")))
+			}
+		}
+	}
+	return out
+}
+
+// componentsOwning returns the components whose code lives in a directory.
+//
+// Both halves matter. A language manifest records the directory it was read
+// from, which is how a repository with no orchestrator is found at all. A
+// container records the build context it is built from, which is how a .env
+// file beside a Dockerfile reaches the service that Compose declares
+// elsewhere. Merged-away nodes are followed to their survivor so that the
+// hint lands on the box the graph will actually draw.
+func (r *resolver) componentsOwning(dir string, byBuildContext map[string][]string) []string {
+	var owners []string
+	add := func(nodeID string) {
+		if merged, ok := r.merges[nodeID]; ok {
+			nodeID = merged
+		}
+		node, ok := r.byID[nodeID]
+		// Only something that runs can hold a reference. A datastore
+		// declared in the same directory is not the owner of its neighbour's
+		// configuration.
+		if !ok || node.Kind != schema.KindService {
+			return
+		}
+		owners = appendUnique(owners, nodeID)
+	}
+
+	for _, nodeID := range r.index.NodesInDirectory(dir) {
+		add(nodeID)
+	}
+	for _, nodeID := range byBuildContext[dir] {
+		add(nodeID)
+	}
+	sort.Strings(owners)
+	return owners
+}
+
+// buildContextIndex groups nodes by the normalized directory their image is
+// built from.
+func (r *resolver) buildContextIndex() map[string][]string {
+	out := map[string][]string{}
+	for _, identity := range r.index.AllIdentities() {
+		if identity.BuildContext == "" {
+			continue
+		}
+		dir := normalizeDir(identity.BuildContext)
+		out[dir] = appendUnique(out[dir], identity.NodeID)
+	}
+	return out
+}
+
+// normalizeDir collapses the ways a repository-relative directory gets
+// written: "", ".", "./web", and "web/" are all one place.
+func normalizeDir(dir string) string {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return "."
+	}
+	return path.Clean(dir)
 }
 
 // matchHints is the main loop: every unresolved reference either becomes an

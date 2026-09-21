@@ -1,0 +1,295 @@
+{
+  "schemaVersion": "0.1.0",
+  "generatedAt": "2026-09-21T04:27:11Z",
+  "contentHash": "sha256:93b4a969fe18b146b9356a74aa85b77dc54280075ca2829e462a9b1295ab2d95",
+  "root": {
+    "name": "react-supabase"
+  },
+  "nodes": [
+    {
+      "id": "external:resolver/net/api.storefront.acme.io",
+      "kind": "external",
+      "layer": "context",
+      "name": "api.storefront.acme.io",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "api.storefront.acme.io"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "web/.env.production",
+          "line": 3
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "external:resolver/net/apn1-crisp-mole-12345.upstash.io",
+      "kind": "external",
+      "layer": "context",
+      "name": "apn1-crisp-mole-12345.upstash.io",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "apn1-crisp-mole-12345.upstash.io"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "worker/.env.production",
+          "line": 2
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "external:resolver/net/db.kbqjfnwtsdplmvxr.supabase.co",
+      "kind": "external",
+      "layer": "context",
+      "name": "db.kbqjfnwtsdplmvxr.supabase.co",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "db.kbqjfnwtsdplmvxr.supabase.co"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "worker/.env.production",
+          "line": 1
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "external:resolver/net/kbqjfnwtsdplmvxr.supabase.co",
+      "kind": "external",
+      "layer": "context",
+      "name": "kbqjfnwtsdplmvxr.supabase.co",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "kbqjfnwtsdplmvxr.supabase.co"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "web/.env.production",
+          "line": 2
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "external:resolver/net/o450001.ingest.sentry.io",
+      "kind": "external",
+      "layer": "context",
+      "name": "o450001.ingest.sentry.io",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "o450001.ingest.sentry.io"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "web/.env.production",
+          "line": 8
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "external:resolver/net/sqs.us-east-1.amazonaws.com",
+      "kind": "external",
+      "layer": "context",
+      "name": "sqs.us-east-1.amazonaws.com",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "sqs.us-east-1.amazonaws.com"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "worker/.env.production",
+          "line": 3
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "service:manifest/javascript/web",
+      "kind": "service",
+      "layer": "container",
+      "name": "storefront-web",
+      "namespace": "javascript",
+      "tech": {
+        "language": "javascript",
+        "framework": "nextjs"
+      },
+      "attrs": {
+        "dependencyCount": 4,
+        "directory": "web",
+        "manifest": "package.json",
+        "package": "storefront-web",
+        "usesTechnology": [
+          "stripe"
+        ]
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "web/package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "service:manifest/javascript/worker",
+      "kind": "service",
+      "layer": "container",
+      "name": "storefront-worker",
+      "namespace": "javascript",
+      "tech": {
+        "language": "javascript"
+      },
+      "attrs": {
+        "dependencyCount": 2,
+        "directory": "worker",
+        "manifest": "package.json",
+        "package": "storefront-worker",
+        "usesTechnology": [
+          "redis",
+          "postgres"
+        ]
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "worker/package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.8
+    }
+  ],
+  "edges": [
+    {
+      "id": "e:37d19565be65",
+      "from": "service:manifest/javascript/web",
+      "to": "external:resolver/net/api.storefront.acme.io",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "dotenv",
+          "path": "web/.env.production",
+          "line": 3,
+          "rule": "external_host",
+          "detail": "env NEXT_PUBLIC_API_URL=https://api.storefront.acme.io (resolves to api.storefront.acme.io)"
+        }
+      ]
+    },
+    {
+      "id": "e:cf802edb9de3",
+      "from": "service:manifest/javascript/web",
+      "to": "external:resolver/net/kbqjfnwtsdplmvxr.supabase.co",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "dotenv",
+          "path": "web/.env.production",
+          "line": 2,
+          "rule": "external_host",
+          "detail": "env NEXT_PUBLIC_SUPABASE_URL=https://kbqjfnwtsdplmvxr.supabase.co (resolves to kbqjfnwtsdplmvxr.supabase.co)"
+        }
+      ]
+    },
+    {
+      "id": "e:abd9407280da",
+      "from": "service:manifest/javascript/web",
+      "to": "external:resolver/net/o450001.ingest.sentry.io",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "dotenv",
+          "path": "web/.env.production",
+          "line": 8,
+          "rule": "external_host",
+          "detail": "env SENTRY_DSN=https://abc123@o450001.ingest.sentry.io/4505 (resolves to o450001.ingest.sentry.io)"
+        }
+      ]
+    },
+    {
+      "id": "e:2343a4b4d5f3",
+      "from": "service:manifest/javascript/worker",
+      "to": "external:resolver/net/apn1-crisp-mole-12345.upstash.io",
+      "kind": "persists_to",
+      "protocol": "redis",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "dotenv",
+          "path": "worker/.env.production",
+          "line": 2,
+          "rule": "external_host",
+          "detail": "env REDIS_URL=rediss://***:***@apn1-crisp-mole-12345.upstash.io:6379 (resolves to apn1-crisp-mole-12345.upstash.io)"
+        }
+      ]
+    },
+    {
+      "id": "e:cb4c280026c5",
+      "from": "service:manifest/javascript/worker",
+      "to": "external:resolver/net/db.kbqjfnwtsdplmvxr.supabase.co",
+      "kind": "persists_to",
+      "protocol": "postgres",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "dotenv",
+          "path": "worker/.env.production",
+          "line": 1,
+          "rule": "external_host",
+          "detail": "env DATABASE_URL=postgres://***:***@db.kbqjfnwtsdplmvxr.supabase.co:5432/postgres (resolves to db.kbqjfnwtsdplmvxr.supabase.co)"
+        }
+      ]
+    },
+    {
+      "id": "e:e38a1d46d524",
+      "from": "service:manifest/javascript/worker",
+      "to": "external:resolver/net/sqs.us-east-1.amazonaws.com",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "dotenv",
+          "path": "worker/.env.production",
+          "line": 3,
+          "rule": "external_host",
+          "detail": "env QUEUE_URL=https://sqs.us-east-1.amazonaws.com/123456789012/orders (resolves to sqs.us-east-1.amazonaws.com)"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "info",
+      "code": "env_placeholder_reference",
+      "path": ".env.example",
+      "message": "NEXT_PUBLIC_SUPABASE_URL, DATABASE_URL, NEXT_PUBLIC_API_URL name locations but are unfilled placeholders, so no edges were drawn for them; their real values are set outside the repository, and whatever they point at is missing from the graph"
+    }
+  ],
+  "stats": {
+    "filesScanned": 5,
+    "filesParsed": 5,
+    "nodeCount": 8,
+    "edgeCount": 6,
+    "connected": 8,
+    "clusters": 2,
+    "durationMs": 0
+  }
+}

@@ -24,13 +24,18 @@ type Match struct {
 	OutOfScope bool
 }
 
-// scopeOf returns the namespace a reference is being made from, or "" when
-// the referrer has none and locality cannot be judged.
+// scopeOf returns the deployment boundary a reference is being made from, or
+// "" when the referrer has none and locality cannot be judged.
+//
+// Returning "" is not a failure. It means this reference has to be matched
+// globally, because nothing about the referrer says which part of the
+// repository it belongs to — which is the honest answer for a service known
+// only from a dependency manifest.
 func scopeOf(from *Identity) string {
 	if from == nil {
 		return ""
 	}
-	return from.Namespace
+	return from.Scope
 }
 
 // localCandidates gathers everything in the referrer's own scope that answers
@@ -242,7 +247,7 @@ func filterInScope(idx *Index, candidates []string, namespace string) []string {
 		if !ok {
 			continue
 		}
-		if identity.Kind == schema.KindExternal || identity.Namespace == namespace {
+		if identity.Kind == schema.KindExternal || identity.Scope == namespace {
 			out = append(out, id)
 		}
 	}

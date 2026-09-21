@@ -8,6 +8,7 @@ package extractors
 import (
 	"github.com/kamronarabi/structura/internal/scan"
 	"github.com/kamronarabi/structura/internal/scan/extractors/compose"
+	"github.com/kamronarabi/structura/internal/scan/extractors/dotenv"
 	"github.com/kamronarabi/structura/internal/scan/extractors/helm"
 	"github.com/kamronarabi/structura/internal/scan/extractors/k8s"
 	"github.com/kamronarabi/structura/internal/scan/extractors/manifest"
@@ -18,6 +19,7 @@ import (
 func Default() *scan.Registry {
 	return scan.NewRegistry(
 		compose.New(),
+		dotenv.New(),
 		helm.New(),
 		k8s.New(),
 		manifest.New(),

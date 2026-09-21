@@ -77,6 +77,15 @@ type Hint struct {
 	// FromNode is the node that holds the reference.
 	FromNode string
 
+	// OwnerDir is set instead of FromNode when the file carrying the
+	// reference is not itself a component and does not name one: a .env file
+	// belongs to whatever service lives in its directory, which the
+	// extractor cannot know because it sees one file. The resolver binds it
+	// once the node set is complete, and reports the reference rather than
+	// attaching it if the directory turns out to hold no component, or more
+	// than one.
+	OwnerDir string
+
 	Kind HintKind
 
 	// Raw is the reference as written. It is redacted before serialization;

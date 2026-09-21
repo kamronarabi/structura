@@ -37,7 +37,29 @@ type Identity struct {
 	Directory string
 	// BuildContext is the directory an image is built from, when known.
 	BuildContext string
+
+	// Scope is the deployment boundary this node belongs to, and is what
+	// decides whether two components are near enough to each other for a
+	// name match between them to mean anything.
+	//
+	// It is usually the namespace, but not always, and the difference
+	// matters. A Kubernetes namespace, a Compose project, and a Helm chart
+	// are boundaries: a name reused across them belongs to an unrelated
+	// stack. A language manifest has no boundary to report, so it puts the
+	// language there instead — and "typescript" is not a project. Treating
+	// it as one silently refuses every edge from a repository whose services
+	// are not containerized, which is the opposite of the intent.
+	Scope string
 }
+
+// scopeFromNamespace reports whether an extractor's namespace names a
+// deployment boundary.
+//
+// Only the manifest extractor does not: it writes the language there, because
+// a dependency manifest genuinely does not know what deploys its code. The
+// name is spelled out rather than imported because the extractors depend on
+// this package, not the other way round.
+func scopeFromNamespace(extractor string) bool { return extractor != "manifest" }
 
 // Index maps every known identity form to the nodes that claim it.
 //
@@ -91,6 +113,11 @@ func identityOf(n schema.Node) *Identity {
 		if id.Namespace == "" {
 			id.Namespace = parsed.Namespace
 		}
+		if scopeFromNamespace(parsed.Source) {
+			id.Scope = id.Namespace
+		}
+	} else {
+		id.Scope = id.Namespace
 	}
 
 	for _, key := range []string{"name", "address", "terraformModule"} {

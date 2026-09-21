@@ -322,3 +322,15 @@ func contains(haystack []string, needle string) bool {
 	}
 	return false
 }
+
+// The resolver has to know that this extractor's namespace holds a language
+// rather than a deployment boundary, and it cannot import this package to ask.
+// It matches on the name instead, so a rename here silently turns that
+// handling off and refuses every edge from a repository with no orchestrator.
+// See resolve.scopeFromNamespace.
+func TestNameIsWhatTheResolverMatchesOn(t *testing.T) {
+	if manifest.Name != "manifest" {
+		t.Fatalf("Name = %q; resolve.scopeFromNamespace matches on \"manifest\" and must be updated together with this",
+			manifest.Name)
+	}
+}
