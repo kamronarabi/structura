@@ -47,8 +47,10 @@ func (g *Graph) Normalize() {
 	if g.SchemaVersion == "" {
 		g.SchemaVersion = Version
 	}
-	g.Stats.NodeCount = len(g.Nodes)
-	g.Stats.EdgeCount = len(g.Edges)
+	// Derived counts are computed here, on the graph as it will be
+	// serialized, so every reader judges the same numbers instead of each
+	// deriving its own.
+	g.Measure()
 
 	// Empty rather than null, so consumers can iterate without a nil check.
 	if g.Nodes == nil {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "0.1.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:88dd386de90df14ef8783ce79529d12860858d0cac2b651fec34de638c939739",
+  "contentHash": "sha256:996fc898418348dcbea937ae245757eff8d74651fa79c997608ad423c1916714",
   "root": {
     "name": "multi-environment"
   },
@@ -332,6 +332,8 @@
     "filesParsed": 11,
     "nodeCount": 8,
     "edgeCount": 4,
+    "connected": 0,
+    "clusters": 4,
     "durationMs": 0
   }
 }

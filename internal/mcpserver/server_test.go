@@ -472,3 +472,19 @@ func TestToolsAcceptTheIdentifiersTheyPrint(t *testing.T) {
 		}
 	}
 }
+
+// TestOverviewWarnsWhenTheGraphIsNotASystem covers the impression a bare
+// component count leaves.
+//
+// A repository of unrelated charts yields hundreds of components and almost
+// no relationships. Reported as "417 components" it reads exactly like a
+// large architecture, and a model asked what depends on what will describe
+// one. The counts are true and the impression is false.
+func TestOverviewWarnsWhenTheGraphIsNotASystem(t *testing.T) {
+	// polyglot-monorepo is a real system; it must not be warned about.
+	session, ctx := connect(t, fixture(t, "polyglot-monorepo"))
+	out, _ := callText(t, session, ctx, "structura_overview", mcpserver.OverviewArgs{})
+	if strings.Contains(out, "does not look like one system") {
+		t.Errorf("a connected system was reported as a collection:\n%s", out)
+	}
+}

@@ -410,3 +410,102 @@ func TestMarshalDoesNotEscapeHTML(t *testing.T) {
 		t.Errorf("ampersand was escaped; the file is meant to be read by humans:\n%s", out)
 	}
 }
+
+// TestMeasureSeparatesASystemFromACollection covers the number that tells a
+// reader which of the two they are looking at.
+//
+// A repository of unrelated charts produces hundreds of components and a
+// handful of relationships. Reported as a component count alone it reads
+// exactly like a large architecture.
+func TestMeasureSeparatesASystemFromACollection(t *testing.T) {
+	system := schema.Graph{
+		Nodes: []schema.Node{
+			{ID: "boundary:k8s/prod/prod", Kind: schema.KindBoundary},
+			{ID: "service:k8s/prod/api", Kind: schema.KindService},
+			{ID: "service:k8s/prod/worker", Kind: schema.KindService},
+			{ID: "datastore:k8s/prod/db", Kind: schema.KindDatastore},
+		},
+		Edges: []schema.Edge{
+			{From: "boundary:k8s/prod/prod", To: "service:k8s/prod/api", Kind: schema.EdgeContains},
+			{From: "boundary:k8s/prod/prod", To: "service:k8s/prod/worker", Kind: schema.EdgeContains},
+			{From: "boundary:k8s/prod/prod", To: "datastore:k8s/prod/db", Kind: schema.EdgeContains},
+			{From: "service:k8s/prod/api", To: "datastore:k8s/prod/db", Kind: schema.EdgePersistsTo},
+			{From: "service:k8s/prod/worker", To: "datastore:k8s/prod/db", Kind: schema.EdgePersistsTo},
+		},
+	}
+	system.Measure()
+	if system.Stats.Clusters != 1 {
+		t.Errorf("a connected system reports %d clusters, want 1", system.Stats.Clusters)
+	}
+	if system.Stats.Connected != 3 {
+		t.Errorf("Connected = %d, want 3", system.Stats.Connected)
+	}
+	if got := system.Cohesion(); got != 1 {
+		t.Errorf("Cohesion() = %v, want 1", got)
+	}
+
+	// The same component count, with nothing joining any of it.
+	collection := schema.Graph{Nodes: system.Nodes}
+	collection.Measure()
+	if collection.Stats.Clusters != 4 {
+		t.Errorf("an unrelated set reports %d clusters, want 4", collection.Stats.Clusters)
+	}
+	if collection.Stats.Connected != 0 {
+		t.Errorf("Connected = %d, want 0", collection.Stats.Connected)
+	}
+	if got := collection.Cohesion(); got != 0 {
+		t.Errorf("Cohesion() = %v, want 0", got)
+	}
+}
+
+// TestContainmentDoesNotImplyRelationship is the distinction the measure
+// rests on.
+//
+// Two charts in one repository share a parent without having anything to do
+// with each other. Counting containment as a relationship would report a
+// package collection as a fully connected system.
+func TestContainmentDoesNotImplyRelationship(t *testing.T) {
+	g := schema.Graph{
+		Nodes: []schema.Node{
+			{ID: "boundary:helm/r/repo", Kind: schema.KindBoundary},
+			{ID: "service:helm/r/a", Kind: schema.KindService},
+			{ID: "service:helm/r/b", Kind: schema.KindService},
+		},
+		Edges: []schema.Edge{
+			{From: "boundary:helm/r/repo", To: "service:helm/r/a", Kind: schema.EdgeContains},
+			{From: "boundary:helm/r/repo", To: "service:helm/r/b", Kind: schema.EdgeContains},
+		},
+	}
+	g.Measure()
+
+	if g.Stats.Connected != 0 {
+		t.Errorf("Connected = %d; containment is structure, not a relationship", g.Stats.Connected)
+	}
+	if g.Cohesion() != 0 {
+		t.Errorf("Cohesion() = %v, want 0", g.Cohesion())
+	}
+	// They do share a cluster: the repository holds both.
+	if g.Stats.Clusters != 1 {
+		t.Errorf("Clusters = %d, want 1", g.Stats.Clusters)
+	}
+}
+
+// TestMeasureRunsOnNormalize keeps the numbers from depending on who asked.
+func TestMeasureRunsOnNormalize(t *testing.T) {
+	g := schema.Graph{
+		Nodes: []schema.Node{
+			{ID: "service:k8s/p/a", Kind: schema.KindService},
+			{ID: "service:k8s/p/b", Kind: schema.KindService},
+		},
+		Edges: []schema.Edge{{ID: "e1", From: "service:k8s/p/a", To: "service:k8s/p/b", Kind: schema.EdgeCalls}},
+	}
+	g.Normalize()
+
+	if g.Stats.Connected != 2 || g.Stats.Clusters != 1 {
+		t.Errorf("Normalize did not measure: connected=%d clusters=%d",
+			g.Stats.Connected, g.Stats.Clusters)
+	}
+	if g.Stats.NodeCount != 2 || g.Stats.EdgeCount != 1 {
+		t.Errorf("counts not set: %+v", g.Stats)
+	}
+}

@@ -150,6 +150,21 @@ func writeGraphSummary(w io.Writer, g schema.Graph) {
 		return
 	}
 
+	// A component count on its own reads like an architecture even when the
+	// components are unrelated, so say which of the two this is before
+	// listing them.
+	var components int
+	for _, n := range g.Nodes {
+		if n.Kind != schema.KindBoundary {
+			components++
+		}
+	}
+	if components >= 8 && g.Cohesion() < 0.25 && g.Stats.Clusters > components/4 {
+		fmt.Fprintf(w, "\nThis looks like a collection rather than one system: %d of %d "+
+			"components stand alone, in %d independent groups.\n",
+			components-g.Stats.Connected, components, g.Stats.Clusters)
+	}
+
 	byKind := map[schema.NodeKind][]schema.Node{}
 	for _, n := range g.Nodes {
 		byKind[n.Kind] = append(byKind[n.Kind], n)

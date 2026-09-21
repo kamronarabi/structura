@@ -1,7 +1,7 @@
 {
   "schemaVersion": "0.1.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:1d3695627ef979625f6dc4ec1d4951e0abae39be39be7ff951f81111d8238b8c",
+  "contentHash": "sha256:28fa87e79f7003edc418c5c53927537f860abc6e957ac858164b578a4ab5058f",
   "root": {
     "name": "k8s-microservices"
   },
@@ -486,6 +486,8 @@
     "filesParsed": 4,
     "nodeCount": 9,
     "edgeCount": 12,
+    "connected": 7,
+    "clusters": 2,
     "durationMs": 0
   }
 }

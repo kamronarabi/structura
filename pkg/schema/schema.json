@@ -216,6 +216,12 @@
         "edgeCount": {
           "type": "integer"
         },
+        "connected": {
+          "type": "integer"
+        },
+        "clusters": {
+          "type": "integer"
+        },
         "durationMs": {
           "type": "integer"
         }
@@ -227,6 +233,8 @@
         "filesParsed",
         "nodeCount",
         "edgeCount",
+        "connected",
+        "clusters",
         "durationMs"
       ]
     },

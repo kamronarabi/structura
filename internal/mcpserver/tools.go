@@ -65,6 +65,10 @@ func (s *Server) overview(ctx context.Context, _ *mcp.CallToolRequest, _ Overvie
 	r.Headerf("%s", name)
 	r.Headerf("%d components, %d relationships, from %d files",
 		len(g.Nodes), countRelationships(g), g.Stats.FilesParsed)
+	if note := shapeNote(g); note != "" {
+		r.Headerf("")
+		r.Headerf("%s", note)
+	}
 
 	if len(g.Nodes) == 0 {
 		r.Headerf("")
@@ -451,6 +455,44 @@ func (s *Server) diagnostics(ctx context.Context, _ *mcp.CallToolRequest, args D
 		}
 	}
 	return textResult(r.StringWithCursor(fmt.Sprintf("%d", start+r.Shown()), "diagnostics")), nil, nil
+}
+
+// shapeNote warns when a graph is an inventory rather than a system.
+//
+// A repository of two hundred unrelated charts produces four hundred
+// components and a handful of relationships. Reported as "417 components" it
+// reads exactly like a large architecture, and a model asked what depends on
+// what will describe one. The counts are true and the impression is false, so
+// the shape has to be stated rather than left to be inferred from them.
+func shapeNote(g schema.Graph) string {
+	var components int
+	for _, n := range g.Nodes {
+		if n.Kind != schema.KindBoundary {
+			components++
+		}
+	}
+	if components < 8 {
+		// Too small for the ratio to mean anything.
+		return ""
+	}
+
+	cohesion := g.Cohesion()
+	switch {
+	case cohesion < 0.25 && g.Stats.Clusters > components/4:
+		return fmt.Sprintf(
+			"This does not look like one system. %d of %d components have no relationship "+
+				"to any other, and what remains falls into %d independent groups — the shape "+
+				"of a package or example collection rather than an architecture. Treat this "+
+				"as an inventory; questions about how components interact will mostly have "+
+				"no answer here.",
+			components-g.Stats.Connected, components, g.Stats.Clusters)
+	case cohesion < 0.5:
+		return fmt.Sprintf(
+			"Only %d of %d components have any relationship; the rest stand alone. "+
+				"structura_diagnostics explains what could not be read, which is often why.",
+			g.Stats.Connected, components)
+	}
+	return ""
 }
 
 func countRelationships(g schema.Graph) int {

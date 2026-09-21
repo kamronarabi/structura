@@ -1,7 +1,7 @@
 {
   "schemaVersion": "0.1.0",
   "generatedAt": "2026-09-20T14:22:31Z",
-  "contentHash": "sha256:9fe1c95186eebd66902c64fcae6a745fcef97d0d4de33ea08c02ce4331c32fc7",
+  "contentHash": "sha256:61e9c4ad99a30172cc1aaa41fab63f5f804fb1ff354fb2f21c00164f85228ca0",
   "root": {
     "name": "acme",
     "vcs": {
@@ -137,6 +137,8 @@
     "filesParsed": 38,
     "nodeCount": 4,
     "edgeCount": 2,
+    "connected": 3,
+    "clusters": 2,
     "durationMs": 412
   }
 }

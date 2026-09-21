@@ -155,6 +155,92 @@ type Stats struct {
 	NodeCount    int `json:"nodeCount"`
 	EdgeCount    int `json:"edgeCount"`
 
+	// Connected counts components taking part in at least one relationship,
+	// excluding boundaries and containment. Everything else is a component
+	// this scan found and could say nothing further about.
+	Connected int `json:"connected"`
+
+	// Clusters counts the independent groups the graph falls into, over both
+	// relationships and containment.
+	//
+	// It is what separates a system from a collection. A repository of two
+	// hundred unrelated charts yields two hundred clusters and is not an
+	// architecture; a service mesh yields one. A reader given "417
+	// components" without this number will take the first for the second,
+	// and a canvas will draw four hundred disconnected dots as though they
+	// were a diagram.
+	Clusters int `json:"clusters"`
+
 	// DurationMs is wall-clock and therefore volatile; Canonical zeroes it.
 	DurationMs int64 `json:"durationMs"`
+}
+
+// Cohesion measures how much of this graph hangs together, between 0 and 1.
+//
+// It is the share of non-boundary components that take part in at least one
+// relationship. Low cohesion is not a defect in the repository — a chart
+// library genuinely has no internal architecture — but it does mean the graph
+// should be presented as an inventory rather than as a picture of a system.
+func (g Graph) Cohesion() float64 {
+	var components int
+	for _, n := range g.Nodes {
+		if n.Kind != KindBoundary {
+			components++
+		}
+	}
+	if components == 0 {
+		return 0
+	}
+	return float64(g.Stats.Connected) / float64(components)
+}
+
+// Measure fills in the derived counts on Stats. Normalize calls it.
+func (g *Graph) Measure() {
+	g.Stats.NodeCount = len(g.Nodes)
+	g.Stats.EdgeCount = len(g.Edges)
+
+	connected := map[string]bool{}
+	parent := map[string]string{}
+	var find func(string) string
+	find = func(x string) string {
+		if parent[x] == "" || parent[x] == x {
+			parent[x] = x
+			return x
+		}
+		parent[x] = find(parent[x])
+		return parent[x]
+	}
+	union := func(a, b string) {
+		ra, rb := find(a), find(b)
+		if ra != rb {
+			parent[ra] = rb
+		}
+	}
+
+	for _, n := range g.Nodes {
+		find(n.ID)
+	}
+	for _, e := range g.Edges {
+		// Containment joins a cluster without making its members related:
+		// two charts in one repository are separate systems even though the
+		// repository holds both.
+		if e.Kind != EdgeContains {
+			connected[e.From] = true
+			connected[e.To] = true
+		}
+		union(e.From, e.To)
+	}
+
+	g.Stats.Connected = 0
+	for _, n := range g.Nodes {
+		if n.Kind != KindBoundary && connected[n.ID] {
+			g.Stats.Connected++
+		}
+	}
+
+	roots := map[string]bool{}
+	for _, n := range g.Nodes {
+		roots[find(n.ID)] = true
+	}
+	g.Stats.Clusters = len(roots)
 }

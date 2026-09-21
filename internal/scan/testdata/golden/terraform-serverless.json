@@ -1,7 +1,7 @@
 {
   "schemaVersion": "0.1.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:b880e38369f28dfaa3179edf37884f835926112a3ea92ff1e138f4b58fbf14d5",
+  "contentHash": "sha256:267e13d01b08aff580c1fb1e32a1cf793013c90aa2975545dbde4aea361a7535",
   "root": {
     "name": "terraform-serverless"
   },
@@ -408,6 +408,8 @@
     "filesParsed": 2,
     "nodeCount": 11,
     "edgeCount": 6,
+    "connected": 7,
+    "clusters": 5,
     "durationMs": 0
   }
 }
