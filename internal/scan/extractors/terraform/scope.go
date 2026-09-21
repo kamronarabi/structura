@@ -30,7 +30,11 @@ const maxLocalPasses = 8
 func newScope(body *hclsyntax.Body) *scope {
 	variables := map[string]cty.Value{}
 	for _, block := range body.Blocks {
-		if block.Type != "variable" || len(block.Labels) != 1 {
+		if block.Type != "variable" {
+			continue
+		}
+		labels, ok := namedLabels(block, 1)
+		if !ok {
 			continue
 		}
 		attr, ok := block.Body.Attributes["default"]
@@ -40,7 +44,7 @@ func newScope(body *hclsyntax.Body) *scope {
 			continue
 		}
 		if v, diags := attr.Expr.Value(nil); !diags.HasErrors() {
-			variables[block.Labels[0]] = v
+			variables[labels[0]] = v
 		}
 	}
 

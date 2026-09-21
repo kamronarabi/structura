@@ -328,15 +328,22 @@ func (s *Server) tracePath(ctx context.Context, _ *mcp.CallToolRequest, args Tra
 			args.From, args.To)), nil, nil
 	}
 
+	// The default is generous because this tool answers blast-radius
+	// questions, where a route left out is the failure. Returning three of
+	// five routes and heading the answer "3 paths" is how a reader concludes
+	// a service is uninvolved when it is on the critical path.
 	maxPaths := args.MaxPaths
-	if maxPaths <= 0 || maxPaths > 10 {
-		maxPaths = 3
+	if maxPaths <= 0 {
+		maxPaths = 10
+	}
+	if maxPaths > 25 {
+		maxPaths = 25
 	}
 
 	r := NewResponse(budgetTracePath)
-	paths := v.paths(from, to, maxPaths)
+	paths, incomplete := v.paths(from, to, maxPaths)
 	if len(paths) == 0 {
-		r.Headerf("No path from %s to %s.", v.label(from), v.label(to))
+		r.Headerf("No path from %s to %s within %d hops.", v.label(from), v.label(to), maxPathDepth)
 		r.Headerf("")
 		// The absence of a path in the graph is not the absence of a
 		// dependency in the system, and saying so is the difference between
@@ -347,8 +354,16 @@ func (s *Server) tracePath(ctx context.Context, _ *mcp.CallToolRequest, args Tra
 		return textResult(r.String()), nil, nil
 	}
 
-	r.Headerf("%d %s from %s to %s:", len(paths),
-		plural(len(paths), "path", "paths"), v.label(from), v.label(to))
+	// The count is only stated as a fact when the search was complete.
+	// "1 path" when a second exists is an affirmative false statement, and it
+	// is exactly the answer someone repeats in an incident channel.
+	if incomplete {
+		r.Headerf("At least %d %s from %s to %s (more may exist; the search was cut short):",
+			len(paths), plural(len(paths), "route", "routes"), v.label(from), v.label(to))
+	} else {
+		r.Headerf("%d %s from %s to %s. This is every route in the graph:", len(paths),
+			plural(len(paths), "path", "paths"), v.label(from), v.label(to))
+	}
 
 	for i, path := range paths {
 		var b strings.Builder

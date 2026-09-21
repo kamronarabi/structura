@@ -1,7 +1,7 @@
 {
   "schemaVersion": "0.1.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:db462e6914c5d5463d334b9ac8acdae1f1e4fd94cc52d094e5a9f2108ad86627",
+  "contentHash": "sha256:3bf7edeb8cac871dbbe1fba8d7126d3478e8be9b6a70758ad9607c515abdfe27",
   "root": {
     "name": "polyglot-monorepo"
   },
@@ -393,8 +393,8 @@
           "extractor": "compose",
           "path": "deploy/docker-compose.yml",
           "line": 6,
-          "rule": "dns_exact",
-          "detail": "env CHECKOUT_URL=http://checkout:9090 (resolves to github.com/acme/shop/checkout)"
+          "rule": "name_exact",
+          "detail": "env CHECKOUT_URL=http://checkout:9090 (resolves to checkout)"
         }
       ]
     }

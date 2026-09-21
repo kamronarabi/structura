@@ -134,19 +134,20 @@ func (m *module) collectDeclarations(body *hclsyntax.Body) {
 	for _, block := range body.Blocks {
 		switch block.Type {
 		case "resource":
-			if len(block.Labels) != 2 {
+			labels, ok := namedLabels(block, 2)
+			if !ok {
 				continue
 			}
-			resourceType, name := block.Labels[0], block.Labels[1]
+			resourceType, name := labels[0], labels[1]
 			class, recognized, _ := classifyResource(resourceType)
 			if !recognized {
 				continue
 			}
 			m.declared[resourceType+"."+name] = m.nodeID(class.kind, resourceType, name)
 		case "module":
-			if len(block.Labels) == 1 {
-				m.declared["module."+block.Labels[0]] =
-					m.nodeID(schema.KindBoundary, "module", block.Labels[0])
+			if labels, ok := namedLabels(block, 1); ok {
+				m.declared["module."+labels[0]] =
+					m.nodeID(schema.KindBoundary, "module", labels[0])
 			}
 		}
 	}
@@ -172,10 +173,11 @@ func (m *module) emitAll(body *hclsyntax.Body, emit scan.Emitter) {
 }
 
 func (m *module) emitResource(block *hclsyntax.Block, emit scan.Emitter, managed bool) {
-	if len(block.Labels) != 2 {
+	labels, ok := namedLabels(block, 2)
+	if !ok {
 		return
 	}
-	resourceType, name := block.Labels[0], block.Labels[1]
+	resourceType, name := labels[0], labels[1]
 	line := block.TypeRange.Start.Line
 
 	class, recognized, plumbing := classifyResource(resourceType)
@@ -263,10 +265,11 @@ func (m *module) emitResource(block *hclsyntax.Block, emit scan.Emitter, managed
 }
 
 func (m *module) emitModule(block *hclsyntax.Block, emit scan.Emitter) {
-	if len(block.Labels) != 1 {
+	labels, ok := namedLabels(block, 1)
+	if !ok {
 		return
 	}
-	name := block.Labels[0]
+	name := labels[0]
 	line := block.TypeRange.Start.Line
 	id := m.nodeID(schema.KindBoundary, "module", name)
 
@@ -426,4 +429,21 @@ func firstErrorLine(diags hcl.Diagnostics) int {
 		}
 	}
 	return 0
+}
+
+// namedLabels returns a block's labels when there are exactly n of them and
+// none is empty. Terraform requires every label to be an identifier, so
+// `resource "aws_sqs_queue" "" {}` is as malformed as a block with the wrong
+// number of labels — but it parses, and an empty label would otherwise reach
+// the graph as a node with no name, which Validate rejects.
+func namedLabels(block *hclsyntax.Block, n int) ([]string, bool) {
+	if len(block.Labels) != n {
+		return nil, false
+	}
+	for _, l := range block.Labels {
+		if l == "" {
+			return nil, false
+		}
+	}
+	return block.Labels, true
 }

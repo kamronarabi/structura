@@ -390,3 +390,85 @@ func TestServerInstructionsWarnAboutTheGraphsLimits(t *testing.T) {
 		}
 	}
 }
+
+// TestTracePathReturnsEveryRoute is the bug a live session found.
+//
+// The old search was breadth-first with a global visited set, so a longer
+// route through an already-seen node was dropped -- and the answer was headed
+// "1 path", stated as fact. For a tool advertised for blast radius that is
+// not an omission, it is a false statement: the reader concludes a service is
+// uninvolved when it sits on a route between the two.
+func TestTracePathReturnsEveryRoute(t *testing.T) {
+	session, ctx := connect(t, fixture(t, "k8s-microservices"))
+
+	out, isErr := callText(t, session, ctx, "structura_trace_path",
+		mcpserver.TracePathArgs{From: "public", To: "orders-db", MaxPaths: 5})
+	if isErr {
+		t.Fatalf("trace_path failed:\n%s", out)
+	}
+
+	// public reaches orders-db directly through checkout, and also through
+	// api-gateway, which calls checkout. Both are real routes.
+	routes := strings.Count(out, "weakest link:")
+	if routes < 2 {
+		t.Errorf("got %d route(s), want at least 2 — the longer route through "+
+			"api-gateway was dropped:\n%s", routes, out)
+	}
+	if !strings.Contains(out, "api-gateway") {
+		t.Errorf("the route through api-gateway is missing:\n%s", out)
+	}
+	if strings.Contains(out, "1 path from") {
+		t.Errorf("the answer claims a single path:\n%s", out)
+	}
+}
+
+// TestTracePathStatesWhetherItIsComplete separates "these are all the routes"
+// from "here are some routes".
+func TestTracePathStatesWhetherItIsComplete(t *testing.T) {
+	session, ctx := connect(t, fixture(t, "k8s-microservices"))
+
+	full, _ := callText(t, session, ctx, "structura_trace_path",
+		mcpserver.TracePathArgs{From: "public", To: "orders-db", MaxPaths: 25})
+	if !strings.Contains(full, "every route") {
+		t.Errorf("a complete search does not say so:\n%s", full)
+	}
+
+	capped, _ := callText(t, session, ctx, "structura_trace_path",
+		mcpserver.TracePathArgs{From: "public", To: "orders-db", MaxPaths: 1})
+	if strings.Contains(capped, "every route") {
+		t.Errorf("a truncated search claims completeness:\n%s", capped)
+	}
+	if !strings.Contains(capped, "At least") {
+		t.Errorf("a truncated search does not flag that more may exist:\n%s", capped)
+	}
+}
+
+// TestToolsAcceptTheIdentifiersTheyPrint closes the round trip.
+//
+// Every tool renders an ambiguous node as "name.namespace". Printing a form
+// and then refusing it makes each edge in every response a dead end the
+// caller has to re-resolve by hand, at the cost of a round trip to learn the
+// real id.
+func TestToolsAcceptTheIdentifiersTheyPrint(t *testing.T) {
+	session, ctx := connect(t, fixture(t, "multi-environment"))
+
+	// This fixture declares "db" in three environments, so every rendering
+	// of it is qualified.
+	ambiguous, isErr := callText(t, session, ctx, "structura_describe_node",
+		mcpserver.DescribeNodeArgs{Node: "db"})
+	if !isErr {
+		t.Skipf("db was not ambiguous in this fixture:\n%s", ambiguous)
+	}
+
+	for _, label := range []string{"db.prod", "db.dev", "db.staging"} {
+		out, isErr := callText(t, session, ctx, "structura_describe_node",
+			mcpserver.DescribeNodeArgs{Node: label})
+		if isErr {
+			t.Errorf("the tools render nodes as %q but refuse it as input:\n%s", label, out)
+			continue
+		}
+		if !strings.Contains(out, "namespace") {
+			t.Errorf("%s resolved to something unexpected:\n%s", label, out)
+		}
+	}
+}

@@ -16,6 +16,73 @@ type Match struct {
 	// Candidates is set when more than one node claimed the reference and
 	// nothing broke the tie.
 	Candidates []string
+	// OutOfScope reports that every candidate lived outside the referrer's
+	// own project or namespace. Such a match is refused rather than drawn:
+	// two unrelated projects in one repository routinely reuse names like
+	// "api" or "orders-db", and an edge between them is fiction that scores
+	// exactly as high as a real one.
+	OutOfScope bool
+}
+
+// scopeOf returns the namespace a reference is being made from, or "" when
+// the referrer has none and locality cannot be judged.
+func scopeOf(from *Identity) string {
+	if from == nil {
+		return ""
+	}
+	return from.Namespace
+}
+
+// localCandidates gathers everything in the referrer's own scope that answers
+// to a token, across every rule rather than stopping at the strongest.
+//
+// ok is false when locality cannot be judged at all, in which case the caller
+// falls back to the global ladder.
+func (idx *Index) localCandidates(token string, h Hint, from *Identity) (byRule []ruleCandidates, ok bool) {
+	scope := scopeOf(from)
+	if scope == "" {
+		return nil, false
+	}
+	for _, rule := range matchRules {
+		candidates := withoutSelf(idx, rule.lookup(idx, token), h.FromNode)
+		if len(candidates) == 0 {
+			continue
+		}
+		if scoped := filterInScope(idx, candidates, scope); len(scoped) > 0 {
+			byRule = append(byRule, ruleCandidates{rule: rule, ids: scoped})
+		}
+	}
+	return byRule, len(byRule) > 0
+}
+
+// ruleCandidates pairs a rule with the nodes it matched.
+type ruleCandidates struct {
+	rule matchRule
+	ids  []string
+}
+
+// decide picks a winner from per-rule candidates.
+//
+// byRule is ordered strongest rule first, and only the strongest rule that
+// matched gets to answer. It deliberately does not fall through to a weaker
+// rule when the strongest is ambiguous: two nodes answering to the same name
+// under dns_exact is a reference the author has to qualify, and quietly
+// resolving it with image_basename instead would turn a question into a
+// guess. This is the ladder's original semantics, kept.
+func (idx *Index) decide(byRule []ruleCandidates, h Hint, from *Identity) (Match, bool) {
+	if len(byRule) == 0 {
+		return Match{}, false
+	}
+	rc := byRule[0]
+	confidence := h.Kind.BaseConfidence() - rc.rule.penalty
+
+	if len(rc.ids) == 1 {
+		return Match{NodeID: rc.ids[0], Rule: rc.rule.name, Confidence: confidence}, true
+	}
+	if narrowed := idx.tieBreak(rc.ids, h, from); len(narrowed) == 1 {
+		return Match{NodeID: narrowed[0], Rule: rc.rule.name + "+scoped", Confidence: confidence}, true
+	}
+	return Match{Rule: rc.rule.name, Candidates: rc.ids}, false
 }
 
 // matchRule is one rung of the precedence ladder, in descending order of how
@@ -71,10 +138,34 @@ func (idx *Index) Resolve(h Hint, from *Identity) (Match, bool) {
 		if token == "" {
 			continue
 		}
+
+		// Locality is decided across the whole ladder, before any single rule
+		// is allowed to answer.
+		//
+		// Otherwise the strongest rule wins on a global index and a weaker
+		// rule never runs. A compose service referring to "orders-db" matched
+		// a Kubernetes Service of that name in an unrelated directory,
+		// because dns_exact found exactly one node and returned before
+		// name_exact could offer the orders-db defined five lines below it in
+		// the same file. One candidate is not the same as the right
+		// candidate.
+		if local, ok := idx.localCandidates(token, h, from); ok {
+			return idx.decide(local, h, from)
+		}
+
 		for _, rule := range matchRules {
-			candidates := withoutSelf(rule.lookup(idx, token), h.FromNode)
+			candidates := withoutSelf(idx, rule.lookup(idx, token), h.FromNode)
 			if len(candidates) == 0 {
 				continue
+			}
+
+			// Reaching here with a scoped referrer means nothing inside its
+			// own project answered; every candidate belongs to someone else.
+			// Two unrelated projects in one repository reuse names like "api"
+			// and "orders-db" constantly, and an edge between them is fiction
+			// that scores exactly as high as a real one.
+			if scopeOf(from) != "" {
+				return Match{Rule: rule.name, Candidates: candidates, OutOfScope: true}, false
 			}
 
 			confidence := h.Kind.BaseConfidence() - rule.penalty
@@ -136,6 +227,28 @@ func (idx *Index) tieBreak(candidates []string, h Hint, from *Identity) []string
 	return candidates
 }
 
+// filterInScope keeps the candidates a reference from within namespace may
+// legitimately reach.
+//
+// That is its own namespace, plus every external system. An external node is
+// a third party -- api.stripe.com, an RDS endpoint, a legacy host -- and does
+// not belong to a namespace at all, so scoping it out would drop exactly the
+// dependencies a reader most wants to see. Namespaces partition the things a
+// repository defines, not the things it calls.
+func filterInScope(idx *Index, candidates []string, namespace string) []string {
+	var out []string
+	for _, id := range candidates {
+		identity, ok := idx.Identity(id)
+		if !ok {
+			continue
+		}
+		if identity.Kind == schema.KindExternal || identity.Namespace == namespace {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 func filterByNamespace(idx *Index, candidates []string, namespace string) []string {
 	var out []string
 	for _, id := range candidates {
@@ -186,12 +299,22 @@ func kindForEdge(kind schema.EdgeKind) schema.NodeKind {
 	}
 }
 
-func withoutSelf(candidates []string, self string) []string {
+func withoutSelf(idx *Index, candidates []string, self string) []string {
 	out := make([]string, 0, len(candidates))
 	for _, id := range candidates {
-		if id != self {
-			out = append(out, id)
+		if id == self {
+			continue
 		}
+		// A boundary is a grouping -- a system, a Compose project, a chart --
+		// and takes part in the graph through contains edges only. Letting a
+		// reference resolve to one produces a service that "depends on" the
+		// very boundary enclosing it, which says nothing and reads as a real
+		// finding. Charts routinely name the boundary and the service alike,
+		// so this fires whenever a chart references its own release name.
+		if identity, ok := idx.Identity(id); ok && identity.Kind == schema.KindBoundary {
+			continue
+		}
+		out = append(out, id)
 	}
 	sort.Strings(out)
 	return out
@@ -227,6 +350,40 @@ func edgeKindFor(suggested schema.EdgeKind, target schema.NodeKind) schema.EdgeK
 // would be wrong two times in three. Saying so is the correct answer — the
 // user can see the gap and fix the scoping, while a fabricated edge would
 // simply be believed.
+// outOfScopeDiagnostic reports a reference whose only candidates lived in
+// another project or namespace.
+//
+// This is a refusal, and it has to be visible. The alternative that shipped
+// before was an edge drawn across unrelated projects at the same confidence
+// as a correct one -- which no confidence threshold protects a reader from,
+// because the fabricated edge scores exactly as high as the real ones.
+func outOfScopeDiagnostic(h Hint, m Match, from *Identity, names func(string) string) schema.Diagnostic {
+	labels := make([]string, 0, len(m.Candidates))
+	for _, id := range m.Candidates {
+		labels = append(labels, names(id))
+	}
+	sort.Strings(labels)
+
+	scope := scopeOf(from)
+	return schema.Diagnostic{
+		Severity: schema.SeverityInfo,
+		Code:     "out_of_scope_reference",
+		Path:     h.Source.Path,
+		Line:     h.Source.Line,
+		Message: fmt.Sprintf(
+			"%q matches only %s, which %s outside %q; no edge was drawn, because a name "+
+				"reused by an unrelated project is not a dependency",
+			h.Raw, strings.Join(labels, ", "), plural(len(labels), "is", "are"), scope),
+	}
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
+}
+
 func ambiguityDiagnostic(h Hint, m Match, names func(string) string) schema.Diagnostic {
 	labels := make([]string, len(m.Candidates))
 	for i, id := range m.Candidates {

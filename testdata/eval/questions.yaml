@@ -142,3 +142,34 @@ questions:
     must_mention: ["no|does not|doesn't", "queue|jobs"]
     must_not_mention: ["redshift", "aurora"]
     max_tool_calls: 5
+
+  # The three below were added after a live session found bugs the first
+  # fifteen could not see. Each fixture was scanned in isolation, so a name
+  # reused across projects never arose, and no question asked for more than
+  # one route -- which is exactly where the tool surface was making confident
+  # false statements.
+
+  - id: k8s-all-routes
+    fixture: k8s-microservices
+    question: >-
+      List every route by which traffic from the public ingress can reach
+      orders-db. I need all of them, not the shortest.
+    must_mention: ["api-gateway", "checkout"]
+    must_not_mention: ["mongodb"]
+    max_tool_calls: 5
+
+  - id: k8s-qualified-name
+    fixture: multi-environment
+    question: Describe the db component in the prod environment.
+    must_mention: ["prod"]
+    must_not_mention: ["mongodb"]
+    max_tool_calls: 4
+
+  - id: polyglot-local-datastore
+    fixture: polyglot-monorepo
+    question: >-
+      Which datastore does the checkout service write to, and is it defined in
+      the same file as checkout or somewhere else?
+    must_mention: ["orders-db", "compose|docker-compose|same"]
+    must_not_mention: ["mongodb"]
+    max_tool_calls: 4

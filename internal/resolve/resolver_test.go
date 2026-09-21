@@ -551,3 +551,105 @@ func TestEveryEdgeCarriesEvidence(t *testing.T) {
 		}
 	}
 }
+
+// TestReferenceResolvesInsideItsOwnScopeFirst is the bug a real scan found:
+// a compose service reached across into an unrelated Kubernetes tree for a
+// name that was defined five lines below it in its own file.
+//
+// The cause was rule precedence beating locality. dns_exact searched a global
+// index, found exactly one node, and returned before name_exact could offer
+// the local one. One candidate is not the same as the right candidate.
+func TestReferenceResolvesInsideItsOwnScopeFirst(t *testing.T) {
+	b := &builder{}
+	local := b.node(schema.KindDatastore, "compose", "shop", "orders-db", nil)
+	foreign := b.node(schema.KindDatastore, "k8s", "prod", "orders-db", nil)
+	// A Service in the foreign namespace contributes DNS names, which is
+	// what makes dns_exact -- the strongest rule -- reach across.
+	b.alias(resolve.Alias{
+		Name: "orders-db", Namespace: "prod", TargetName: "orders-db",
+		DNS: []string{"orders-db", "orders-db.prod", "orders-db.prod.svc.cluster.local"},
+	})
+	_ = foreign
+	checkout := b.node(schema.KindService, "compose", "shop", "checkout", nil)
+	b.hint(resolve.Hint{
+		FromNode: checkout, Kind: resolve.HintConnString,
+		Raw:    "postgres://checkout@orders-db:5432/orders",
+		Tokens: []string{"orders-db"}, Port: 5432, SuggestedEdge: schema.EdgePersistsTo,
+	})
+
+	r := b.run()
+	if len(r.Edges) != 1 {
+		t.Fatalf("want exactly one edge, got %v", r.edgeList())
+	}
+	if got := r.Edges[0].To; got != local {
+		t.Errorf("resolved to %q, want the same-project %q; a name reused by an "+
+			"unrelated project is not a dependency", got, local)
+	}
+}
+
+// TestOutOfScopeReferenceIsRefusedAndReported covers the other half: when the
+// only candidate belongs to someone else, no edge is drawn and the refusal is
+// visible.
+//
+// Silence would leave a reader concluding the component has no such
+// dependency, when one was found and rejected.
+func TestOutOfScopeReferenceIsRefusedAndReported(t *testing.T) {
+	b := &builder{}
+	b.node(schema.KindQueue, "compose", "shop", "broker", nil)
+	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	b.hint(resolve.Hint{
+		FromNode: api, Kind: resolve.HintConnString, Raw: "amqp://broker:5672",
+		Tokens: []string{"broker"}, Port: 5672, SuggestedEdge: schema.EdgePublishesTo,
+	})
+
+	r := b.run()
+	if len(r.Edges) != 0 {
+		t.Errorf("a cross-project reference produced edges: %v", r.edgeList())
+	}
+	if !r.hasDiag("out_of_scope_reference") {
+		t.Fatal("a refused cross-project reference was not reported")
+	}
+}
+
+// TestExternalsAreReachableFromAnyNamespace guards the fix to the fix.
+//
+// Scoping references to a namespace must not scope out third parties. An
+// external system belongs to no namespace, and dropping those edges would
+// remove exactly the dependencies a reader most wants to see.
+func TestExternalsAreReachableFromAnyNamespace(t *testing.T) {
+	b := &builder{}
+	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	b.hint(resolve.Hint{
+		FromNode: api, Kind: resolve.HintEnvURL, Raw: "https://api.stripe.com",
+		Tokens: []string{"api.stripe.com"}, SuggestedEdge: schema.EdgeCalls,
+	})
+
+	r := b.run()
+	if len(r.Edges) != 1 {
+		t.Fatalf("an external dependency was dropped by namespace scoping: %v", r.edgeList())
+	}
+}
+
+// TestBoundariesAreNeverResolutionTargets keeps a service from "depending on"
+// the grouping that encloses it.
+//
+// A boundary is a system or a chart, and takes part through contains edges
+// only. Charts routinely name the boundary and the service alike, so without
+// this a chart referencing its own release name produces an edge that says
+// nothing and reads as a finding.
+func TestBoundariesAreNeverResolutionTargets(t *testing.T) {
+	b := &builder{}
+	b.node(schema.KindBoundary, "helm", "podinfo", "podinfo", nil)
+	svc := b.node(schema.KindService, "helm", "podinfo", "podinfo-svc", nil)
+	b.hint(resolve.Hint{
+		FromNode: svc, Kind: resolve.HintEnvHost, Raw: "podinfo",
+		Tokens: []string{"podinfo"}, SuggestedEdge: schema.EdgeCalls,
+	})
+
+	r := b.run()
+	for _, e := range r.Edges {
+		if strings.HasPrefix(e.To, "boundary:") && e.Kind != schema.EdgeContains {
+			t.Errorf("a reference resolved to a boundary: %v", r.edgeList())
+		}
+	}
+}

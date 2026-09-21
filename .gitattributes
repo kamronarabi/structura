@@ -1,0 +1,6 @@
+# Golden files are compared byte for byte against what the code generates,
+# and the generators always emit LF. GitHub's windows-latest runners ship
+# core.autocrlf=true, so without this every golden file and committed fuzz
+# corpus entry is rewritten to CRLF on checkout and the comparison fails on
+# Windows only. The tree is text throughout, so it is all checked out as LF.
+* text=auto eol=lf

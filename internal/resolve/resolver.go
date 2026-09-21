@@ -274,7 +274,17 @@ func (r *resolver) matchHints(hints []Hint) {
 		case ok:
 			r.addEdge(h, match)
 		case len(match.Candidates) > 1:
+			// Several components answer to the name. That is the dominant
+			// fact and the actionable one -- the reference has to be
+			// qualified -- whether or not they also sit outside the
+			// referrer's scope.
 			r.diags = append(r.diags, ambiguityDiagnostic(h, match, r.displayName))
+		case match.OutOfScope:
+			// Exactly one component answers, and it belongs to someone else.
+			// Refused rather than drawn, and said out loud: silence would
+			// leave the reader believing the component has no such
+			// dependency, when in fact one was found and rejected.
+			r.diags = append(r.diags, outOfScopeDiagnostic(h, match, from, r.displayName))
 		default:
 			r.unmatched(h)
 		}
@@ -313,7 +323,7 @@ func (r *resolver) matchLibrary(h Hint) {
 	existing, _ := from.Attrs["usesTechnology"].([]string)
 	from.Attrs["usesTechnology"] = dedupe(append(existing, tech))
 
-	candidates := withoutSelf(r.index.byTech[tech], h.FromNode)
+	candidates := withoutSelf(r.index, r.index.byTech[tech], h.FromNode)
 	if len(candidates) != 1 {
 		return
 	}

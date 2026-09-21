@@ -1,6 +1,6 @@
 {
   "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-20T23:12:17Z",
+  "generatedAt": "2026-09-21T03:26:54Z",
   "contentHash": "sha256:463414e6869039d37337a1b2b07ddcc0ca47b5231a91a3347060ffe1981ed743",
   "root": {
     "name": "multi-environment"
@@ -179,6 +179,6 @@
     "filesParsed": 11,
     "nodeCount": 4,
     "edgeCount": 0,
-    "durationMs": 0
+    "durationMs": 2
   }
 }

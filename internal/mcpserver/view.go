@@ -55,6 +55,21 @@ func (v *view) resolveRef(ref string) (nodeID string, candidates []string, err e
 	}
 
 	matches := append([]string(nil), v.byName[strings.ToLower(ref)]...)
+
+	// Every tool renders an ambiguous node as "name.namespace", so that form
+	// has to be accepted as input. Printing an identifier and then refusing
+	// it makes each edge in every response a dead end the caller has to
+	// re-resolve by hand, and costs a round trip to learn the real id.
+	if len(matches) == 0 {
+		if name, namespace, ok := strings.Cut(ref, "."); ok {
+			for _, id := range v.byName[strings.ToLower(name)] {
+				if n := v.byID[id]; n != nil && strings.EqualFold(n.Namespace, namespace) {
+					matches = append(matches, id)
+				}
+			}
+		}
+	}
+
 	if len(matches) == 0 {
 		// A partial name is the next most likely thing a model will send.
 		for id, n := range v.byID {
@@ -133,75 +148,128 @@ func (f nodeFilter) matches(n schema.Node) bool {
 	return true
 }
 
-// paths finds the shortest routes between two nodes.
+// maxPathDepth bounds how long a route may be before it stops explaining
+// anything. Nothing in a dependency graph is usefully described by a
+// twelve-hop chain.
+const maxPathDepth = 8
+
+// pathSearchBudget bounds the total work of an enumeration.
 //
-// Breadth-first from the source, so every path returned is of minimal length.
-// Longer alternatives are deliberately not explored: a model asking how A
-// reaches B wants the dependency chain, and enumerating every walk through a
-// connected graph would blow the budget on paths nobody would draw.
-func (v *view) paths(from, to string, maxPaths int) [][]schema.Edge {
+// Counting every simple path between two nodes is exponential in a dense
+// graph. The budget keeps a pathological input from hanging a tool call, and
+// exhausting it is reported rather than hidden, because a truncated search
+// that claims completeness is the bug this function was rewritten to fix.
+const pathSearchBudget = 200_000
+
+// paths enumerates the distinct routes from one node to another, shortest
+// first.
+//
+// This deliberately finds every simple path within the depth cap, not just
+// the shortest ones. The tool built on it answers blast-radius questions,
+// where a missed route is the whole failure: a breadth-first search that
+// stops at the first time it reaches a node will report that A reaches B one
+// way, when in fact a second service also sits on a route between them. The
+// earlier implementation did exactly that and stated "1 path" as a fact.
+//
+// exhausted reports that the search hit its budget, so the caller can say the
+// list may be incomplete instead of implying it is not.
+func (v *view) paths(from, to string, maxPaths int) (found [][]schema.Edge, exhausted bool) {
 	if from == to {
-		return nil
+		return nil, false
 	}
 
-	type state struct {
-		node string
-		path []schema.Edge
-	}
-	queue := []state{{node: from}}
-	visited := map[string]bool{from: true}
+	// Depth-first with a path-local visited set: a node already on the
+	// current path is skipped, so routes stay simple, but a node visited on
+	// some other path stays available to this one.
+	var (
+		path   []schema.Edge
+		onPath = map[string]bool{from: true}
+		steps  int
+		walk   func(node string) bool
+	)
 
-	var found [][]schema.Edge
-	depth := 0
-	for len(queue) > 0 && len(found) < maxPaths {
-		// Bound the search: beyond a handful of hops a "path" stops being an
-		// explanation of anything.
-		depth++
-		if depth > 32 {
-			break
+	walk = func(node string) bool {
+		if len(path) >= maxPathDepth {
+			return false
 		}
-		var next []state
-		levelVisited := map[string]bool{}
-
-		for _, s := range queue {
-			edges := append([]schema.Edge(nil), v.outgoing[s.node]...)
-			sort.SliceStable(edges, func(i, j int) bool {
-				if edges[i].To != edges[j].To {
-					return edges[i].To < edges[j].To
-				}
-				return edges[i].Kind < edges[j].Kind
-			})
-
-			for _, e := range edges {
-				if e.Kind == schema.EdgeContains {
-					continue
-				}
-				path := append(append([]schema.Edge(nil), s.path...), e)
-				if e.To == to {
-					found = append(found, path)
-					if len(found) >= maxPaths {
-						break
-					}
-					continue
-				}
-				if visited[e.To] {
-					continue
-				}
-				levelVisited[e.To] = true
-				next = append(next, state{node: e.To, path: path})
+		edges := append([]schema.Edge(nil), v.outgoing[node]...)
+		sort.SliceStable(edges, func(i, j int) bool {
+			if edges[i].To != edges[j].To {
+				return edges[i].To < edges[j].To
 			}
-			if len(found) >= maxPaths {
-				break
+			return edges[i].Kind < edges[j].Kind
+		})
+
+		for _, e := range edges {
+			if e.Kind == schema.EdgeContains {
+				continue
+			}
+			steps++
+			if steps > pathSearchBudget {
+				return true // budget exhausted; stop everything
+			}
+			if e.To == to {
+				found = append(found, append(append([]schema.Edge(nil), path...), e))
+				continue
+			}
+			if onPath[e.To] {
+				continue
+			}
+			onPath[e.To] = true
+			path = append(path, e)
+			stop := walk(e.To)
+			path = path[:len(path)-1]
+			onPath[e.To] = false
+			if stop {
+				return true
 			}
 		}
-		// Marking visited a level at a time rather than on enqueue lets two
-		// distinct shortest paths through different neighbours both surface.
-		for node := range levelVisited {
-			visited[node] = true
-		}
-		queue = next
+		return false
 	}
-	return found
+
+	exhausted = walk(from)
+
+	// Shortest first, then by weakest link descending, so the most direct and
+	// best-evidenced route is the one a reader sees first.
+	sort.SliceStable(found, func(i, j int) bool {
+		if len(found[i]) != len(found[j]) {
+			return len(found[i]) < len(found[j])
+		}
+		wi, wj := weakestLink(found[i]), weakestLink(found[j])
+		if wi != wj {
+			return wi > wj
+		}
+		return pathKey(found[i]) < pathKey(found[j])
+	})
+
+	// total is reported before truncation so the caller can say how many were
+	// withheld rather than silently dropping them.
+	if maxPaths > 0 && len(found) > maxPaths {
+		return found[:maxPaths], true
+	}
+	return found, exhausted
+}
+
+// weakestLink is a path's least confident edge, which is as much as the whole
+// chain can be trusted.
+func weakestLink(path []schema.Edge) float64 {
+	weakest := 1.0
+	for _, e := range path {
+		if e.Confidence < weakest {
+			weakest = e.Confidence
+		}
+	}
+	return weakest
+}
+
+// pathKey renders a path for deterministic ordering.
+func pathKey(path []schema.Edge) string {
+	var b strings.Builder
+	for _, e := range path {
+		b.WriteString(e.To)
+		b.WriteByte('\x00')
+	}
+	return b.String()
 }
 
 func techString(t *schema.Tech) string {

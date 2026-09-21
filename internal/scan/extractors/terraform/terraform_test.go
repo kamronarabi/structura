@@ -477,6 +477,10 @@ func FuzzExtract(f *testing.F) {
 	f.Add(`locals { a = "${local.a}" }`)
 	f.Add(`variable "x" { default = 1 }`)
 	f.Add("resource {")
+	// Empty labels parse but are not valid Terraform; they once reached the
+	// graph as a node with no name.
+	f.Add(`resource "aws_sqs_queue" "" {}`)
+	f.Add(`module "" { source = "./x" }`)
 	f.Add("")
 	f.Add(strings.Repeat(`resource "a_b" "c" {}`+"\n", 50))
 
@@ -500,4 +504,50 @@ func FuzzExtract(f *testing.F) {
 			}
 		}
 	})
+}
+
+// Terraform requires every block label to be an identifier. HCL parses an
+// empty one anyway, and a resource named "" used to become a node with no
+// name, which the schema rejects downstream. Skipping the block matches how
+// a block with the wrong number of labels is already handled.
+func TestEmptyBlockLabelsAreSkipped(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{"resource with empty name", `resource "aws_sqs_queue" "" {}`},
+		{"resource with empty type", `resource "" "jobs" {}`},
+		{"data with empty name", `data "aws_sqs_queue" "" {}`},
+		{"module with empty name", `module "" { source = "./vpc" }`},
+		{"variable with empty name", `variable "" { default = "x" }`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := extract(t, "main.tf", tt.src)
+			if len(c.nodes) != 0 {
+				t.Errorf("emitted %d node(s) for a block with an empty label: %+v", len(c.nodes), c.nodes)
+			}
+			for _, n := range c.nodes {
+				if err := n.Validate(); err != nil {
+					t.Errorf("emitted an invalid node: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// A valid resource declared alongside a malformed one still lands in the
+// graph: one bad block does not abort the file.
+func TestEmptyLabelDoesNotSuppressValidSiblings(t *testing.T) {
+	c := extract(t, "main.tf", `
+resource "aws_sqs_queue" "" {}
+resource "aws_sqs_queue" "jobs" { name = "jobs" }
+`)
+	if len(c.nodes) != 1 {
+		t.Fatalf("got %d nodes, want 1: %+v", len(c.nodes), c.nodes)
+	}
+	if c.nodes[0].Name != "jobs" {
+		t.Errorf("node name = %q, want %q", c.nodes[0].Name, "jobs")
+	}
 }
