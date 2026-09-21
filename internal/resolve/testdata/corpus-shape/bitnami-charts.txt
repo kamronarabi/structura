@@ -1,0 +1,34 @@
+bitnami-charts
+  files       4122 scanned, 3185 parsed
+  nodes       417
+  edges       190
+  connected   7 of 302 components
+  clusters    227
+
+  nodes by kind
+    boundary                           115
+    cloud_resource                     3
+    datastore                          83
+    external                           3
+    queue                              5
+    service                            208
+
+  nodes by layer
+    container                          299
+    context                            118
+
+  edges by kind
+    calls                              4
+    contains                           186
+
+  edges by rule
+    dns_exact                          1
+    external_host                      3
+    helm_chart_dependency              186
+
+  diagnostics
+    info helm_values_inferred          113
+    info out_of_scope_reference        7
+    info unresolved_reference          103
+    warn file_too_large                2
+    warn helm_unrendered               113

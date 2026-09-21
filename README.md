@@ -47,7 +47,8 @@ between what it finds. `structura mcp` serves the result to an editor, and
 `structura install-mcp` wires it up. What is left is shipping binaries.
 
 Resolver quality is measured against real repositories rather than asserted
-(`make corpus && make corpus-test`):
+(`make corpus && make corpus-test`). Seven are pinned by commit. Three have
+hand-written expectation files and are scored:
 
 | Repository | Precision | Recall |
 |---|---|---|
@@ -66,6 +67,15 @@ them — two statements of one fact, and Structura reads only one of them. That
 check is what corrected the microservices-demo figure. It had read 1.00 while
 missing seven real edges, because the expectations had been scoped, without
 anyone meaning to, to what the scanner could already see.
+
+The other four have no architecture to get right — a grab-bag of Kubernetes
+examples, a hundred unrelated Compose stacks, a Terraform module library, and
+`bitnami/charts`, which yields 417 nodes and four real relationships from 4,122
+files. Scoring them would measure nothing, so instead every repository has the
+shape of its result pinned: how much was found, of what kinds, by which rules,
+and what could not be read. The input is fixed by commit, so those numbers move
+only when Structura changes. That is stability, not correctness, and the
+distinction is deliberate.
 
 The two shortfalls are different kinds of gap, and only one of them is ours:
 

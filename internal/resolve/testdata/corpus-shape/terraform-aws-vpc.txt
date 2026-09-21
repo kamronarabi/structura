@@ -1,0 +1,27 @@
+terraform-aws-vpc
+  files       111 scanned, 19 parsed
+  nodes       48
+  edges       19
+  connected   15 of 47 components
+  clusters    35
+
+  nodes by kind
+    boundary                           1
+    cloud_resource                     47
+
+  nodes by layer
+    container                          47
+    context                            1
+
+  edges by kind
+    depends_on                         19
+
+  edges by rule
+    terraform_reference                19
+
+  diagnostics
+    info terraform_external_module     4
+    info terraform_unexpanded          1
+    info terraform_unrecognized_resource 14
+    info terraform_unresolved_reference 2
+    info unresolved_reference          11

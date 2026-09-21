@@ -1,0 +1,37 @@
+online-boutique
+  files       363 scanned, 76 parsed
+  nodes       23
+  edges       35
+  connected   16 of 19 components
+  clusters    6
+
+  nodes by kind
+    boundary                           4
+    cloud_resource                     4
+    datastore                          2
+    service                            13
+
+  nodes by layer
+    container                          19
+    context                            4
+
+  edges by kind
+    calls                              16
+    contains                           15
+    depends_on                         2
+    exposes                            1
+    persists_to                        1
+
+  edges by rule
+    dns_exact                          18
+    k8s_namespace_member               15
+    terraform_reference                2
+
+  diagnostics
+    info code_joined_to_deployment     10
+    info k8s_patch_fragment            1
+    info kustomize_unrendered          21
+    info terraform_external_module     3
+    info terraform_unrecognized_resource 1
+    info unresolved_reference          1
+    warn helm_unrendered               1

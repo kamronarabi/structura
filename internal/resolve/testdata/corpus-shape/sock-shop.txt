@@ -1,0 +1,39 @@
+sock-shop
+  files       197 scanned, 100 parsed
+  nodes       71
+  edges       79
+  connected   30 of 63 components
+  clusters    15
+
+  nodes by kind
+    boundary                           8
+    cloud_resource                     3
+    datastore                          7
+    queue                              2
+    service                            51
+
+  nodes by layer
+    container                          63
+    context                            8
+
+  edges by kind
+    calls                              3
+    contains                           54
+    depends_on                         20
+    persists_to                        2
+
+  edges by rule
+    compose_depends_on                 20
+    compose_project_member             26
+    dns_exact                          2
+    k8s_namespace_member               28
+    name_exact                         1
+    terraform_reference                2
+
+  diagnostics
+    info helm_values_inferred          1
+    info terraform_unexpanded          3
+    info terraform_unrecognized_resource 1
+    info unmatched_service_selector    8
+    info unresolved_reference          13
+    warn helm_unrendered               1

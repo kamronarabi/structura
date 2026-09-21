@@ -1,0 +1,31 @@
+podinfo
+  files       364 scanned, 58 parsed
+  nodes       27
+  edges       23
+  connected   5 of 22 components
+  clusters    7
+
+  nodes by kind
+    boundary                           5
+    datastore                          1
+    service                            21
+
+  nodes by layer
+    container                          22
+    context                            5
+
+  edges by kind
+    calls                              3
+    contains                           20
+
+  edges by rule
+    compose_project_member             6
+    dns_exact                          1
+    k8s_namespace_member               14
+    name_exact                         2
+
+  diagnostics
+    info helm_values_inferred          2
+    info kustomize_unrendered          8
+    warn ambiguous_reference           2
+    warn helm_unrendered               1

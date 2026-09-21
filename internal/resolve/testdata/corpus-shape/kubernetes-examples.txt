@@ -1,0 +1,32 @@
+kubernetes-examples
+  files       454 scanned, 172 parsed
+  nodes       99
+  edges       100
+  connected   7 of 96 components
+  clusters    3
+
+  nodes by kind
+    boundary                           3
+    cloud_resource                     19
+    datastore                          14
+    service                            63
+
+  nodes by layer
+    container                          96
+    context                            3
+
+  edges by kind
+    calls                              3
+    contains                           96
+    exposes                            1
+
+  edges by rule
+    dns_exact                          4
+    k8s_namespace_member               96
+
+  diagnostics
+    info k8s_service_without_selector  1
+    info service_selects_many          9
+    info unmatched_service_selector    12
+    info unresolved_reference          6
+    warn k8s_parse_failed              10

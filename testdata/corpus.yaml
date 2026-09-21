@@ -13,6 +13,15 @@
 # Terraform-heavy shapes, at a range of sizes. Helm prevalence in particular
 # is a question the plan wants answered before more is built on the decision
 # not to render charts.
+#
+# Two different things are measured here, and only one of them is a quality
+# score. Three repositories have hand-written expectation files and are scored
+# for precision and recall. The rest have no architecture to get right --
+# a grab-bag, a hundred unrelated stacks, a module library -- so scoring them
+# would measure nothing. Every repository, scored or not, has the shape of its
+# result pinned: how much was found, of what kinds, by which rules, and what
+# could not be read. The input is fixed by commit, so those numbers move only
+# when Structura changes, which is when someone should look.
 
 repos:
   - name: sock-shop
@@ -55,4 +64,7 @@ repos:
     url: https://github.com/bitnami/charts
     ref: bd57775ec33ee9780938091f9bc12bf73a921918
     shape: helm only
-    note: Very large. Bounded by --max-repo-files when cloned.
+    note: |
+      Very large: 4,122 files, of which 3,185 parse. It yields 417 nodes and
+      four real relationships, which is the point -- it is the scale and
+      pathological-input case, not an architecture to get right.

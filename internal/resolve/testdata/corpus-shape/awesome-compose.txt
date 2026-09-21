@@ -1,0 +1,34 @@
+awesome-compose
+  files       493 scanned, 60 parsed
+  nodes       119
+  edges       114
+  connected   56 of 81 components
+  clusters    39
+
+  nodes by kind
+    boundary                           38
+    cloud_resource                     6
+    datastore                          20
+    queue                              1
+    service                            54
+
+  nodes by layer
+    container                          81
+    context                            38
+
+  edges by kind
+    calls                              2
+    contains                           80
+    depends_on                         21
+    persists_to                        10
+    publishes_to                       1
+
+  edges by rule
+    compose_depends_on                 26
+    compose_project_member             80
+    name_exact                         13
+
+  diagnostics
+    info env_placeholder_reference     1
+    info unresolved_reference          1
+    warn compose_parse_failed          1
