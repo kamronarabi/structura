@@ -95,10 +95,25 @@ func (s *Source) isStale(ctx context.Context, stored schema.Graph) (stale bool, 
 		return true, "a manifest has changed since the graph was written", nil
 	}
 	// A graph written by a different build of the binary may not mean what
-	// this one expects it to.
-	if stored.SchemaVersion != schema.Version {
-		return true, fmt.Sprintf("the stored graph is schema %s, this binary speaks %s",
-			stored.SchemaVersion, schema.Version), nil
+	// this one expects it to. What to do about that depends on which
+	// direction the difference runs; see pkg/schema/compat.go.
+	switch compat := schema.CompareVersion(stored.SchemaVersion); compat.Relation {
+	case schema.RelationSame:
+	case schema.RelationOlder, schema.RelationIncompatible:
+		// Older: rescanning picks up whatever this build learned to see
+		// since. Incompatible: nothing about it can be trusted, and a fresh
+		// scan is the only honest answer.
+		return true, compat.Reason(), nil
+	case schema.RelationNewer:
+		// Deliberately not stale. Rescanning would overwrite a graph that
+		// holds more than this build can represent, and graph.json is meant
+		// to be committed, so the loss would land in someone's history
+		// looking like an architecture change. Serving it as parsed is
+		// honest -- every field this build understands still means what it
+		// always did -- so the only thing owed is saying so.
+		s.log.Warn("serving a graph from a newer schema; some of it is invisible to this build",
+			"stored", compat.Stored, "current", compat.Current,
+			"remedy", "upgrade structura, or delete .structura/graph.json to rebuild it")
 	}
 	return false, "", nil
 }

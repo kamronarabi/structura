@@ -10,13 +10,21 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/debug"
+
+	"github.com/kamronarabi/structura/pkg/schema"
 )
 
 // SchemaVersion is the version of the Structura Architecture Graph format
 // emitted by this binary. It is versioned independently of the CLI: a CLI
 // bugfix does not imply a schema change, and the cloud tier must be able to
 // ingest graphs produced by many CLI versions at once.
-const SchemaVersion = "0.1.0"
+//
+// It aliases the schema package's own constant rather than restating it. Two
+// literals would drift the first time one of them was bumped, and the symptom
+// would be `structura version` reporting a schema version different from the
+// one the binary actually writes into every graph -- which is worse than no
+// report at all, because it is believable.
+const SchemaVersion = schema.Version
 
 var (
 	version = "dev"

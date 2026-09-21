@@ -3,9 +3,9 @@
 // server, the UI, and the cloud tier consume.
 //
 // This package is the project's public API. Breaking changes to these types
-// are breaking changes to SchemaVersion, which is versioned independently of
-// the CLI binary — a CLI bugfix must not imply a schema change, and the cloud
-// tier has to ingest graphs produced by many CLI versions at once.
+// are breaking changes to SchemaVersion. What counts as a break, what a
+// version bump promises, and how a build should treat a graph written by a
+// different one are all defined in compat.go, alongside Version itself.
 //
 // Two invariants hold across the whole package:
 //
@@ -20,10 +20,6 @@
 package schema
 
 import "time"
-
-// Version is the schema version this package implements. It follows SemVer
-// independently of the CLI version.
-const Version = "0.1.0"
 
 // Graph is a complete architecture snapshot of one repository.
 type Graph struct {

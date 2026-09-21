@@ -96,6 +96,21 @@ matching a credential pattern is masked before it touches disk:
 `postgres://***:***@db:5432/orders`. This is a tested invariant with its own CI
 gate, not a best effort.
 
+## The graph format is versioned separately from the CLI
+
+`graph.json` carries a `schemaVersion` that moves independently of the binary,
+because the file gets committed and is then read by builds that are not the
+one that wrote it. A minor bump is additive and only additive — new optional
+fields, new node or edge kinds — so a reader built for an earlier minor still
+understands everything it recognizes. Anything that removes a field, retypes
+one, or changes what an existing kind means is a major bump. Those rules hold
+at `0.x` too, where SemVer would permit otherwise.
+
+A build reading a graph from a *newer* schema serves it as it is rather than
+rescanning over it, since rewriting it would delete whatever that build cannot
+represent and land the deletion in someone's history looking like an
+architecture change. `pkg/schema/compat.go` is the full statement.
+
 ## Wiring it into an editor
 
 ```sh
