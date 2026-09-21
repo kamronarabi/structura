@@ -20,6 +20,7 @@ const (
 	budgetDescribe    = 1500
 	budgetTracePath   = 2000
 	budgetDiagnostics = 1000
+	budgetImpact      = 2000
 )
 
 // mostConnected bounds the overview's busiest-components list. The overview
@@ -690,4 +691,162 @@ func plural(n int, one, many string) string {
 		return one
 	}
 	return many
+}
+
+// ImpactOfArgs identifies a component and which way to look from it.
+type ImpactOfArgs struct {
+	Node      string `json:"node" jsonschema:"the component to start from, by id or name"`
+	Direction string `json:"direction,omitempty" jsonschema:"dependents (what breaks if this fails, the default) or dependencies (what this needs to work)"`
+	MaxDepth  int    `json:"maxDepth,omitempty" jsonschema:"how many hops to follow; defaults to 8"`
+}
+
+// impactOf reports the transitive closure around a component.
+//
+// describe_node answers one hop, and "what breaks if the database goes down"
+// is not a one-hop question. Recovering the answer from one-hop calls means
+// one call per component, a graph walk performed by hand, and no way to know
+// when the set has closed -- which is both the token cost this server exists
+// to avoid and a walk a model gets wrong in a way that reads as confident.
+func (s *Server) impactOf(ctx context.Context, _ *mcp.CallToolRequest, args ImpactOfArgs) (*mcp.CallToolResult, any, error) {
+	g, err := s.source.Graph(ctx)
+	if err != nil {
+		return errorResult("could not read the architecture graph: %v", err), nil, nil
+	}
+	v := newView(g)
+
+	dependents := true
+	switch strings.ToLower(strings.TrimSpace(args.Direction)) {
+	case "", "dependents", "upstream":
+	case "dependencies", "downstream":
+		dependents = false
+	default:
+		return errorResult("unknown direction %q; use dependents (what breaks if this fails) "+
+			"or dependencies (what this needs to work)", args.Direction), nil, nil
+	}
+
+	id, candidates, err := v.resolveRef(args.Node)
+	if err != nil {
+		return errorResult("%v%s", err, candidateHint(candidates)), nil, nil
+	}
+	n := v.byID[id]
+
+	found := v.reachable(id, dependents, args.MaxDepth)
+	r := NewResponse(budgetImpact)
+
+	if len(found) == 0 {
+		writeEmptyImpact(r, v, n, dependents)
+		return textResult(r.String()), nil, nil
+	}
+
+	verb := "depend on"
+	if !dependents {
+		verb = "are depended on by"
+	}
+	// The share matters as much as the count. A datastore half the system
+	// reaches is a different risk from one two services use, and "12
+	// components" alone does not distinguish them.
+	components := countComponents(g)
+	r.Headerf("%d of %d components %s %s, directly or indirectly.",
+		len(found), components, verb, v.label(id))
+
+	if weakest := weakestReach(found); weakest < schema.ConfDeclared {
+		r.Headerf("Some of it is reached only through inferred edges, the weakest at %.2f.", weakest)
+	}
+
+	for depth := 1; depth <= maxReachDepth; depth++ {
+		at := reachAtDepth(found, depth)
+		if len(at) == 0 {
+			continue
+		}
+		r.Headerf("")
+		r.Headerf("%s (%d):", hopHeading(depth), len(at))
+		r.Expect(len(at))
+		for _, c := range at {
+			line := fmt.Sprintf("  %-28s %s (%.2f)", v.label(c.id), c.kind, c.weakest)
+			if depth > 1 {
+				line += "  via " + v.label(c.via)
+			}
+			if !r.Itemf("%s", line) {
+				break
+			}
+		}
+	}
+
+	r.Headerf("")
+	r.Headerf("Distance is the shortest route, and the confidence is the weakest edge on it.")
+	r.Headerf("structura_trace_path shows the routes themselves; structura_diagnostics")
+	r.Headerf("lists what the scan could not read, which is what this set may be missing.")
+	return textResult(r.String()), nil, nil
+}
+
+// writeEmptyImpact explains an empty closure rather than stating one.
+//
+// Nothing reaching a component is a real and common answer, but so is the
+// scan having been unable to see what does -- and those read identically
+// unless the difference is spelled out.
+func writeEmptyImpact(r *Response, v *view, n *schema.Node, dependents bool) {
+	if dependents {
+		r.Headerf("Nothing in the graph depends on %s.", v.label(n.ID))
+	} else {
+		r.Headerf("%s depends on nothing in the graph.", v.label(n.ID))
+	}
+	r.Headerf("")
+
+	related := v.diagnosticsFor(n)
+	if len(related) == 0 {
+		r.Headerf("Nothing was reported about the files this component is declared in")
+		r.Headerf("either. It may genuinely stand alone, or it may be reached from")
+		r.Headerf("application code, which a configuration scan cannot see.")
+		return
+	}
+	r.Headerf("The scan did report problems with the files it is declared in, which")
+	r.Headerf("may be why:")
+	r.Expect(len(related))
+	for _, d := range related {
+		if !r.Itemf("  [%s] %s at %s\n      %s",
+			d.Severity, d.Code, location(d.Path, d.Line), d.Message) {
+			break
+		}
+	}
+	r.Headerf("")
+	r.Headerf("(Matched by file, so an entry may concern another object in the same file.)")
+}
+
+func hopHeading(depth int) string {
+	if depth == 1 {
+		return "Directly"
+	}
+	return fmt.Sprintf("%d hops away", depth)
+}
+
+func reachAtDepth(found []reach, depth int) []reach {
+	var out []reach
+	for _, c := range found {
+		if c.depth == depth {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func weakestReach(found []reach) float64 {
+	weakest := 1.0
+	for _, c := range found {
+		if c.weakest < weakest {
+			weakest = c.weakest
+		}
+	}
+	return weakest
+}
+
+// countComponents excludes boundaries, which are groupings rather than things
+// that can break.
+func countComponents(g schema.Graph) int {
+	var n int
+	for _, node := range g.Nodes {
+		if node.Kind != schema.KindBoundary {
+			n++
+		}
+	}
+	return n
 }

@@ -18,6 +18,11 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// wantTools is the size of the advertised surface. A tool that appears or
+// disappears without this number moving is a change to the contract a model
+// reads before it chooses anything.
+const wantTools = 6
+
 // buildBinary compiles the CLI once per test binary.
 //
 // The in-process tests exercise the tool logic; these exercise the thing the
@@ -90,12 +95,12 @@ func TestProtocolHandshakeOverStdio(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listing tools over stdio: %v\nstderr:\n%s", err, stderr.String())
 	}
-	if len(tools.Tools) != 5 {
+	if len(tools.Tools) != wantTools {
 		var names []string
 		for _, tool := range tools.Tools {
 			names = append(names, tool.Name)
 		}
-		t.Fatalf("got %d tools over stdio (%s), want 5", len(tools.Tools), strings.Join(names, ", "))
+		t.Fatalf("got %d tools over stdio (%s), want %d", len(tools.Tools), strings.Join(names, ", "), wantTools)
 	}
 
 	res, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "structura_overview"})

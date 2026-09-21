@@ -132,6 +132,7 @@ func TestListToolsAdvertisesTheWholeSurface(t *testing.T) {
 		"structura_list_nodes":    false,
 		"structura_describe_node": false,
 		"structura_trace_path":    false,
+		"structura_impact_of":     false,
 		"structura_diagnostics":   false,
 	}
 	for _, tool := range res.Tools {
@@ -668,4 +669,121 @@ func TestTruncationNoticeAgreesWithTheHeader(t *testing.T) {
 	if notice[1] == notice[2] {
 		t.Errorf("notice claims everything was shown while announcing truncation: %s", notice[0])
 	}
+}
+
+// The question describe_node cannot answer. orders-db is reached by checkout
+// directly, by api-gateway through checkout, and by the load balancer through
+// both -- and recovering that from one-hop calls means walking the graph by
+// hand with no way to know when the set has closed.
+func TestImpactOfReachesBeyondOneHop(t *testing.T) {
+	s, ctx := connect(t, fixture(t, "k8s-microservices"))
+
+	out, isErr := callText(t, s, ctx, "structura_impact_of", map[string]any{"node": "orders-db"})
+	if isErr {
+		t.Fatalf("impact_of failed: %s", out)
+	}
+
+	direct, beyond, ok := strings.Cut(out, "2 hops away")
+	if !ok {
+		t.Fatalf("nothing was found beyond one hop, which is the whole point:\n%s", out)
+	}
+	if !strings.Contains(direct, "checkout") {
+		t.Errorf("checkout is not listed as a direct dependent:\n%s", out)
+	}
+	for _, want := range []string{"api-gateway", "public"} {
+		if !strings.Contains(beyond, want) {
+			t.Errorf("%s reaches orders-db through checkout but is not listed:\n%s", want, out)
+		}
+	}
+	if !strings.Contains(out, "3 of 8 components") {
+		t.Errorf("the header does not put the blast radius in proportion:\n%s", out)
+	}
+	// Distance is only useful if it is reported from where it was reached.
+	if !strings.Contains(beyond, "via checkout") {
+		t.Errorf("a route beyond one hop does not say what it came through:\n%s", out)
+	}
+}
+
+// Every component in this fixture sits inside the prod namespace. Following
+// containment would put all of them one hop from the boundary and two from
+// each other, so a database's blast radius would be the entire namespace --
+// including the third-party systems it has nothing to do with.
+func TestImpactOfDoesNotTravelThroughContainment(t *testing.T) {
+	s, ctx := connect(t, fixture(t, "k8s-microservices"))
+
+	out, isErr := callText(t, s, ctx, "structura_impact_of", map[string]any{"node": "orders-db"})
+	if isErr {
+		t.Fatalf("impact_of failed: %s", out)
+	}
+	for _, unrelated := range []string{"prod", "api.stripe.com", "session-cache", "analytics"} {
+		if strings.Contains(out, unrelated) {
+			t.Errorf("%q is in orders-db's blast radius; containment was followed:\n%s", unrelated, out)
+		}
+	}
+}
+
+// A chain is worth what its weakest edge is worth, and a blast radius
+// computed through a 0.70 inference is a different claim from one computed
+// through declared dependencies.
+func TestImpactOfCarriesTheWeakestEdgeOnTheRoute(t *testing.T) {
+	s, ctx := connect(t, fixture(t, "k8s-microservices"))
+
+	out, isErr := callText(t, s, ctx, "structura_impact_of",
+		map[string]any{"node": "api-gateway", "direction": "dependencies"})
+	if isErr {
+		t.Fatalf("impact_of failed: %s", out)
+	}
+	if !strings.Contains(out, "weakest at 0.70") {
+		t.Errorf("the response does not say how far the weakest evidence goes:\n%s", out)
+	}
+	// orders-db is two hops away, through checkout at 0.80, so the route is
+	// worth 0.80 and not the 1.00 an unqualified list would imply.
+	line := lineContaining(out, "orders-db")
+	if !strings.Contains(line, "0.80") || !strings.Contains(line, "via checkout") {
+		t.Errorf("orders-db's route is not priced by its weakest link: %q", line)
+	}
+}
+
+func TestImpactOfExplainsAnEmptyResult(t *testing.T) {
+	s, ctx := connect(t, fixture(t, "k8s-microservices"))
+
+	out, isErr := callText(t, s, ctx, "structura_impact_of",
+		map[string]any{"node": "orders-db", "direction": "dependencies"})
+	if isErr {
+		t.Fatalf("impact_of failed: %s", out)
+	}
+	if !strings.Contains(out, "depends on nothing in the graph") {
+		t.Fatalf("an empty result was not stated:\n%s", out)
+	}
+	// An empty set and an unseen set read identically unless the difference
+	// is spelled out.
+	if !strings.Contains(out, "application code") {
+		t.Errorf("an empty result is presented as fact rather than as a limit:\n%s", out)
+	}
+}
+
+func TestImpactOfRejectsAnUnknownDirection(t *testing.T) {
+	s, ctx := connect(t, fixture(t, "k8s-microservices"))
+
+	out, isErr := callText(t, s, ctx, "structura_impact_of",
+		map[string]any{"node": "orders-db", "direction": "sideways"})
+	if !isErr {
+		t.Fatalf("an unknown direction was accepted:\n%s", out)
+	}
+	for _, want := range []string{"dependents", "dependencies"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the error does not name %q as a valid direction: %s", want, out)
+		}
+	}
+}
+
+// lineContaining returns the first line holding a substring, for assertions
+// about one entry rather than the whole response.
+func lineContaining(out, want string) string {
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, want) {
+			return line
+		}
+	}
+	return ""
 }

@@ -77,6 +77,9 @@ extracted from infrastructure and dependency manifests.
 
 Start with structura_overview to see what exists, then structura_describe_node
 for any component, and structura_trace_path to find how one reaches another.
+structura_impact_of answers "what breaks if this fails" in a single call --
+prefer it to walking describe_node outwards, which costs a call per component
+and gives you no way to tell when you have found them all.
 
 Two things to keep in mind when using the answers:
 
@@ -114,6 +117,13 @@ func (s *Server) registerTools() {
 		Description: "Find the shortest dependency paths from one component to another. " +
 			"Use this for blast-radius and reachability questions.",
 	}, s.tracePath)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "structura_impact_of",
+		Description: "List everything that transitively depends on a component, or " +
+			"everything it transitively depends on, grouped by distance. Use this for " +
+			"\"what breaks if this fails\" rather than walking describe_node by hand.",
+	}, s.impactOf)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "structura_diagnostics",

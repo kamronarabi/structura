@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -372,4 +373,119 @@ func attrSummary(attrs schema.Attrs, limit int) string {
 		parts = append(parts, fmt.Sprintf("%s=%v", k, attrs[k]))
 	}
 	return strings.Join(parts, " ")
+}
+
+// maxReachDepth bounds a transitive closure. Beyond this a component is
+// related to the subject only in the sense that everything in a connected
+// graph is related to everything else.
+const maxReachDepth = 8
+
+// reach is one component found in a transitive closure, with the shortest
+// distance to it and the best route at that distance.
+type reach struct {
+	id    string
+	depth int
+	// via is the neighbour this component was reached through, so a reader
+	// can see the shape of the route without asking for the whole path.
+	via  string
+	kind schema.EdgeKind
+	// weakest is the least confident edge on the route. A blast radius
+	// computed through a 0.40 naming-convention guess is a different claim
+	// from one computed through declared dependencies, and collapsing the
+	// two would hide exactly the distinction the confidence model exists to
+	// draw.
+	weakest float64
+}
+
+// reachable returns everything that transitively depends on a component, or
+// everything it transitively depends on, by shortest distance.
+//
+// This is what a one-hop view cannot answer. "What breaks if this database
+// goes down" is the set of components that reach it, and recovering that from
+// describe_node means one call per component and a graph walk done by hand --
+// which is both the token cost this server exists to avoid and a walk a model
+// gets wrong, because it has no way to know when it has closed the set.
+//
+// Breadth-first, so depth is the true shortest distance. All candidates at a
+// depth are settled before the next depth is expanded, which makes the
+// reported route the strongest of the shortest ones rather than whichever the
+// traversal happened to reach first.
+//
+// Containment is skipped: a namespace holding a component does not depend on
+// it, and following those edges would put every component in one namespace in
+// every other's blast radius.
+func (v *view) reachable(start string, dependents bool, maxDepth int) []reach {
+	if maxDepth <= 0 || maxDepth > maxReachDepth {
+		maxDepth = maxReachDepth
+	}
+
+	best := map[string]reach{}
+	frontier := []reach{{id: start, weakest: 1}}
+
+	for depth := 1; depth <= maxDepth && len(frontier) > 0; depth++ {
+		found := map[string]reach{}
+		for _, cur := range frontier {
+			edges := v.outgoing[cur.id]
+			if dependents {
+				edges = v.incoming[cur.id]
+			}
+			for _, e := range edges {
+				if e.Kind == schema.EdgeContains {
+					continue
+				}
+				peer := e.To
+				if dependents {
+					peer = e.From
+				}
+				// The subject is not in its own blast radius, and a
+				// component already settled at a shorter distance keeps it.
+				if peer == start {
+					continue
+				}
+				if _, settled := best[peer]; settled {
+					continue
+				}
+				cand := reach{
+					id: peer, depth: depth, via: cur.id, kind: e.Kind,
+					weakest: math.Min(cur.weakest, e.Confidence),
+				}
+				if prev, ok := found[peer]; ok && !betterRoute(cand, prev) {
+					continue
+				}
+				found[peer] = cand
+			}
+		}
+
+		frontier = frontier[:0]
+		for _, c := range found {
+			best[c.id] = c
+			frontier = append(frontier, c)
+		}
+		sort.Slice(frontier, func(i, j int) bool { return frontier[i].id < frontier[j].id })
+	}
+
+	out := make([]reach, 0, len(best))
+	for _, c := range best {
+		out = append(out, c)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].depth != out[j].depth {
+			return out[i].depth < out[j].depth
+		}
+		if out[i].weakest != out[j].weakest {
+			return out[i].weakest > out[j].weakest
+		}
+		return out[i].id < out[j].id
+	})
+	return out
+}
+
+// betterRoute prefers the route a reader should be told about: the best
+// evidenced one, then by name so that two equally good routes do not depend
+// on map iteration order.
+func betterRoute(a, b reach) bool {
+	if a.weakest != b.weakest {
+		return a.weakest > b.weakest
+	}
+	return a.via < b.via
 }
