@@ -44,6 +44,9 @@ type expectation struct {
 	Source  string `yaml:"source"`
 	Edges   []pair `yaml:"edges"`
 	Allowed []pair `yaml:"allowed"`
+	// Oracle, when present, lets the expectations themselves be checked
+	// against the application source. See oracle_test.go.
+	Oracle *oracleSpec `yaml:"oracle"`
 }
 
 type pair struct {
