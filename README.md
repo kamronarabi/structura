@@ -3,8 +3,8 @@
 **Map your architecture from the configs you already have.**
 
 Structura scans a repository's infrastructure and dependency manifests — Docker
-Compose, Kubernetes, Helm, Terraform, `go.mod`, `package.json`, `requirements.txt` —
-and builds a **Structura Architecture Graph (SAG)**: the services, datastores,
+Compose, Kubernetes, Helm, Terraform, `.env`, `go.mod`, `package.json`,
+`requirements.txt` — and builds a **Structura Architecture Graph (SAG)**: the services, datastores,
 queues, and external systems in your stack, plus the inferred edges between them.
 
 It then serves that graph to AI coding agents over the Model Context Protocol,
@@ -21,8 +21,9 @@ structura install-mcp --client claude-code
 Asking a model to infer architecture by reading source burns enormous context
 for a low-fidelity answer, and it has to re-derive the same picture every
 session. Structura does the extraction once, deterministically, and hands the
-model a queryable index — overview, node lookup, path tracing — with each tool
-response held to a token budget.
+model a queryable index — overview, node lookup, path tracing, blast radius,
+and the gaps in its own coverage — with each tool response held to a token
+budget.
 
 ## Status
 
@@ -41,8 +42,8 @@ development. Nothing is released yet.
 | M7 Release | 🔜 |
 
 `structura scan` works today against Docker Compose, Kubernetes, Helm,
-Terraform, and language manifests, and infers the relationships between what
-it finds. `structura mcp` serves the result to an editor, and
+Terraform, `.env` files, and language manifests, and infers the relationships
+between what it finds. `structura mcp` serves the result to an editor, and
 `structura install-mcp` wires it up. What is left is shipping binaries.
 
 Resolver quality is measured against real repositories rather than asserted
@@ -50,15 +51,36 @@ Resolver quality is measured against real repositories rather than asserted
 
 | Repository | Precision | Recall |
 |---|---|---|
-| GoogleCloudPlatform/microservices-demo | 1.00 | 1.00 |
+| GoogleCloudPlatform/microservices-demo | 1.00 | 0.71 |
 | stefanprodan/podinfo | 1.00 | 1.00 |
 | Weaveworks Sock Shop | 1.00 | 0.07 |
 
-Sock Shop is the honest counterexample and is kept in the corpus for that
-reason: its services find each other through hostnames compiled into the
-application code, so a configuration-only scan cannot see them. That is a gap
-for Phase 2's source extractors to close, and it shows up here as low recall
-rather than as invented edges.
+Precision is gated in CI; recall is reported. A missing edge is a visible gap —
+the diagram looks sparse and you notice. A wrong edge is invisible and actively
+harmful, because a model reasons on top of it.
+
+The expected edges are hand-written, so they are themselves checked against the
+application source rather than trusted: a service names its dependencies in
+environment variables, configuration supplies them, and the source consumes
+them — two statements of one fact, and Structura reads only one of them. That
+check is what corrected the microservices-demo figure. It had read 1.00 while
+missing seven real edges, because the expectations had been scoped, without
+anyone meaning to, to what the scanner could already see.
+
+The two shortfalls are different kinds of gap, and only one of them is ours:
+
+- **microservices-demo, 0.71.** Every instrumented service exports traces to an
+  OpenTelemetry collector, declared in `helm-chart/templates/` behind a
+  conditional. Structura reads those files but does not render Helm, so it
+  finds none of the seven. Rendering would close it, and the scan already says
+  so — `helm_unrendered` is in the diagnostics.
+- **Sock Shop, 0.07.** This is the honest counterexample, kept in the corpus
+  for that reason. The repository is a deployment repository: its manifests
+  declare the workloads but almost no addresses between them, and it contains
+  no application source at all, since each service lives in its own repository.
+  So the relationships are not stated anywhere Structura is looking. Phase 2's
+  source extractors would not close this one either — there is nothing here for
+  them to read. Scanning the service repositories would.
 
 ## Every edge shows its work
 
@@ -73,14 +95,15 @@ it fired on:
 ```json
 {
   "from": "service:k8s/prod/api-gateway",
-  "to": "datastore:k8s/prod/postgres",
+  "to": "datastore:k8s/prod/session-cache",
   "kind": "persists_to",
   "confidence": 0.80,
   "evidence": [{
-    "rule": "env_host_match",
-    "path": "deploy/prod/api.yaml",
-    "line": 30,
-    "detail": "env DATABASE_URL host 'postgres' matches Service postgres.prod"
+    "extractor": "k8s",
+    "rule": "dns_exact",
+    "path": "deploy/prod/api-gateway.yaml",
+    "line": 4,
+    "detail": "container \"api\" env REDIS_URL=redis://session-cache:6379/0 (resolves to session-cache)"
   }]
 }
 ```
@@ -137,11 +160,17 @@ make            # tidy + lint + cgo-free + race tests + determinism
 make test       # fast unit tests
 make build      # → bin/structura
 make demo       # scan a fixture repo and print the result
-make eval       # ask a model 15 questions through the MCP tools (needs an API key)
+make eval       # ask a model 18 questions through the MCP tools (needs an API key)
 make help       # all targets
 ```
 
-The eval scores **15/15 on `claude-opus-5`, at 4.2 tool calls per question**.
+It last scored **15/15 on `claude-opus-5`, at 4.2 tool calls per question** —
+on the fifteen questions that existed at the time. Three have been added since,
+and the tool surface has gained a tool and changed several response formats, so
+that figure describes a version of the product that no longer exists. It is
+reported rather than removed because a stale measurement someone can date is
+more useful than none, but it is not a current result and the suite needs
+re-running before the release.
 
 `make eval` is the only check that is deliberately outside CI. It calls the
 API, so it costs money and is nondeterministic, and a flaky gate gets disabled
