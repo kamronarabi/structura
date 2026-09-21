@@ -68,7 +68,7 @@ Use --dry-run to see the exact diff without touching anything.`,
 				return err
 			}
 
-			entry, err := serverEntry(binPath, opts.Root)
+			entry, err := serverEntry(binPath, opts.Root, chosen)
 			if err != nil {
 				return err
 			}
@@ -79,8 +79,8 @@ Use --dry-run to see the exact diff without touching anything.`,
 			}
 
 			if change.NoOp() {
-				fmt.Fprintf(out, "%s is already configured to use this repository.\n  %s\n",
-					target.Title, path)
+				fmt.Fprintf(out, "%s is already configured%s.\n  %s\n",
+					target.Title, scopeSuffix(chosen), path)
 				return nil
 			}
 
@@ -109,8 +109,14 @@ Use --dry-run to see the exact diff without touching anything.`,
 			if backup != "" {
 				fmt.Fprintf(out, "Backed up the original to %s\n", backup)
 			}
-			fmt.Fprintf(out, "\nRestart %s to pick up the change, then ask it about this repository's architecture.\n",
-				target.Title)
+			fmt.Fprintf(out, "\nRestart %s to pick up the change.\n", target.Title)
+			if chosen == ideconfig.ScopeGlobal {
+				fmt.Fprintf(out, "It will serve whichever repository you open, so start %s "+
+					"from the project you want to ask about.\n", target.Title)
+			} else {
+				fmt.Fprintf(out, "This config applies only when %s is started from %s.\n",
+					target.Title, filepath.Clean(opts.Root))
+			}
 			return nil
 		},
 	}
@@ -123,6 +129,15 @@ Use --dry-run to see the exact diff without touching anything.`,
 	f.BoolVar(&listOnly, "list", false, "list the supported clients and where each config lives")
 
 	return cmd
+}
+
+// scopeSuffix describes what a configuration covers, since "configured to use
+// this repository" is only true for a project-scoped install.
+func scopeSuffix(scope ideconfig.Scope) string {
+	if scope == ideconfig.ScopeGlobal {
+		return " for every project"
+	}
+	return " to use this repository"
 }
 
 // resolveScope picks a scope, defaulting to the narrowest one the client
@@ -151,10 +166,17 @@ func resolveScope(client ideconfig.Client, requested string) (ideconfig.Scope, e
 
 // serverEntry builds the command the editor will launch.
 //
-// The binary is recorded by absolute path and the repository by absolute
-// path, because the editor launches this process from a working directory we
-// do not control and cannot predict.
-func serverEntry(binPath, root string) (ideconfig.Entry, error) {
+// The binary is always recorded by absolute path, because the editor launches
+// this process from a working directory we do not control.
+//
+// The repository is pinned only for a project-scoped install, where the
+// config lives inside the repository it describes and naming it is correct. A
+// user-scoped config applies to every project the editor opens, so pinning a
+// root there would serve one repository's architecture in all of them -- and
+// the failure is silent, because the answers look perfectly well-formed. With
+// no --root the server reads the directory it was launched from, which is the
+// project the user is actually in.
+func serverEntry(binPath, root string, scope ideconfig.Scope) (ideconfig.Entry, error) {
 	if binPath == "" {
 		exe, err := os.Executable()
 		if err != nil {
@@ -177,6 +199,10 @@ func serverEntry(binPath, root string) (ideconfig.Entry, error) {
 	// break every config we wrote.
 	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
 		abs = resolved
+	}
+
+	if scope == ideconfig.ScopeGlobal {
+		return ideconfig.Entry{Command: abs, Args: []string{"mcp"}}, nil
 	}
 
 	absRoot, err := filepath.Abs(root)

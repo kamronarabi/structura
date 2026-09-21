@@ -276,3 +276,71 @@ func TestInstallMCPVSCodeUsesItsOwnShape(t *testing.T) {
 		t.Errorf(`the VS Code config has no "servers" object:\n%s`, data)
 	}
 }
+
+// TestInstallMCPGlobalScopeDoesNotPinARepository is the one that matters for
+// a user-level config.
+//
+// A global config applies to every project the editor opens. Recording
+// --root there would serve one repository's architecture in all of them, and
+// the failure is silent: the answers are well-formed, they just describe the
+// wrong system. With no --root the server reads the directory it was launched
+// from, which is the project the user is actually in.
+func TestInstallMCPGlobalScopeDoesNotPinARepository(t *testing.T) {
+	root, binary := repoWithBinary(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	code, out, errOut := run(t, "install-mcp", "--client", "cursor", "--scope", "global",
+		"-C", root, "--binary", binary)
+	if code != 0 {
+		t.Fatalf("exit code = %d (stderr: %s)", code, errOut)
+	}
+
+	data, err := os.ReadFile(filepath.Join(home, ".cursor", "mcp.json")) //nolint:gosec // test-controlled path
+	if err != nil {
+		t.Fatalf("reading the global config: %v", err)
+	}
+	var config struct {
+		MCPServers map[string]struct {
+			Args []string `json:"args"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("the config is not valid JSON: %v\n%s", err, data)
+	}
+
+	args := config.MCPServers["structura"].Args
+	for _, arg := range args {
+		if arg == "--root" {
+			t.Fatalf("a global config pinned a repository: %v\n"+
+				"every project the editor opens would be served this one's architecture", args)
+		}
+	}
+	if len(args) != 1 || args[0] != "mcp" {
+		t.Errorf("args = %v, want [mcp]", args)
+	}
+
+	// And the message must not promise something it cannot deliver.
+	if strings.Contains(out, "this repository's architecture") {
+		t.Errorf("a global install claims it serves this repository:\n%s", out)
+	}
+}
+
+// TestInstallMCPProjectScopeStillPinsTheRepository is the other half: inside
+// a repository, naming it is correct.
+func TestInstallMCPProjectScopeStillPinsTheRepository(t *testing.T) {
+	root, binary := repoWithBinary(t)
+
+	if code, _, errOut := run(t, "install-mcp", "--client", "claude-code",
+		"-C", root, "--binary", binary); code != 0 {
+		t.Fatalf("exit code = %d (stderr: %s)", code, errOut)
+	}
+
+	data, err := os.ReadFile(filepath.Join(root, ".mcp.json")) //nolint:gosec // test-controlled path
+	if err != nil {
+		t.Fatalf("reading the config: %v", err)
+	}
+	if !strings.Contains(string(data), "--root") {
+		t.Errorf("a project config did not pin its own repository:\n%s", data)
+	}
+}
