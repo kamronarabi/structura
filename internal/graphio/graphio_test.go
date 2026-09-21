@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/kamronarabi/structura/internal/graphio"
@@ -116,6 +117,12 @@ func TestSaveIsAtomic(t *testing.T) {
 }
 
 func TestSavedGraphIsReadableByOtherTools(t *testing.T) {
+	// Windows has no Unix permission bits. Go synthesises a mode from the
+	// read-only attribute alone, so every writable file reports 0666 and the
+	// distinction this test draws does not exist there.
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission bits are not modelled on Windows")
+	}
 	root := t.TempDir()
 	if _, err := graphio.Save(root, sampleGraph(t)); err != nil {
 		t.Fatal(err)

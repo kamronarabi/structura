@@ -361,8 +361,13 @@ func TestResolverConnectsAKubernetesRepository(t *testing.T) {
 	for _, n := range g.Nodes {
 		names[n.ID] = n.Name
 	}
+	// Containment is structure, not a relationship the resolver inferred;
+	// this test is about what resolution produced.
 	found := map[string]schema.Edge{}
 	for _, e := range g.Edges {
+		if e.Kind == schema.EdgeContains {
+			continue
+		}
 		found[names[e.From]+" -> "+names[e.To]] = e
 	}
 

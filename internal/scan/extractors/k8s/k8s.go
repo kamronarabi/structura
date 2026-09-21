@@ -228,6 +228,50 @@ func namespaceOf(m *manifest) string {
 	return DefaultNamespace
 }
 
+// emitNamespaceBoundary places a component inside the namespace that deploys
+// it, and declares that namespace as a boundary if nothing has yet.
+//
+// Without this a Kubernetes repository has no hierarchy at all: Compose emits
+// a boundary per project and Helm one per chart, but plain manifests produced
+// a flat list of workloads with nothing enclosing them. A C4 view is built on
+// exactly this nesting -- a system you can open to see its containers -- so a
+// diagram drawn from a manifest repository had no level to zoom out to.
+//
+// A namespace is the right grouping to use. It is the boundary Kubernetes
+// itself enforces for naming, DNS and access, which is the same line the
+// resolver already refuses to match across.
+func emitNamespaceBoundary(f *scan.File, emit scan.Emitter, memberID, ns string, line int) {
+	boundaryID := schema.NewNodeID(schema.KindBoundary, Name, ns, ns)
+	if boundaryID == memberID {
+		return
+	}
+
+	// Emitted per member; the builder merges the repeats into one node.
+	emit.Node(schema.Node{
+		ID:        boundaryID,
+		Kind:      schema.KindBoundary,
+		Layer:     schema.LayerContext,
+		Name:      ns,
+		Namespace: ns,
+		Tech:      &schema.Tech{Runtime: "kubernetes"},
+		Attrs:     schema.Attrs{"orchestrator": "kubernetes", "namespace": ns},
+		Sources:   []schema.Source{{Extractor: Name, Path: f.Path, Line: line}},
+		// The namespace is stated by the manifests themselves, even when it
+		// is the implicit default.
+		Confidence: schema.ConfDeclared,
+	})
+
+	emit.Edge(schema.Edge{
+		From: boundaryID, To: memberID, Kind: schema.EdgeContains,
+		Confidence: schema.ConfDeclared,
+		Evidence: []schema.Evidence{{
+			Extractor: Name, Path: f.Path, Line: line,
+			Rule:   "k8s_namespace_member",
+			Detail: fmt.Sprintf("deployed into namespace %q", ns),
+		}},
+	})
+}
+
 // emitWorkload turns a controller into the component it runs.
 func (e *Extractor) emitWorkload(f *scan.File, pos *yamlpos.Locator, doc int, emit scan.Emitter, m *manifest) {
 	ns := namespaceOf(m)
@@ -298,6 +342,8 @@ func (e *Extractor) emitWorkload(f *scan.File, pos *yamlpos.Locator, doc int, em
 		Sources:    []schema.Source{src},
 		Confidence: schema.ConfDeclared,
 	})
+
+	emitNamespaceBoundary(f, emit, id, ns, line)
 
 	// A StatefulSet's governing service is a name for this workload, stated
 	// outright rather than by selector.
@@ -414,6 +460,8 @@ func (e *Extractor) emitIngress(f *scan.File, pos *yamlpos.Locator, doc int, emi
 		Sources:    []schema.Source{{Extractor: Name, Path: f.Path, Line: line}},
 		Confidence: schema.ConfDeclared,
 	})
+
+	emitNamespaceBoundary(f, emit, id, ns, line)
 
 	for _, target := range ingressBackends(m) {
 		emit.Hint(resolve.Hint{

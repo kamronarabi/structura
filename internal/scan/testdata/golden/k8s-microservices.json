@@ -1,11 +1,53 @@
 {
   "schemaVersion": "0.1.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:21b037c950861a15cfc29b6b365b4561ef274e6e2f51137deadfbf0c548d9153",
+  "contentHash": "sha256:1d3695627ef979625f6dc4ec1d4951e0abae39be39be7ff951f81111d8238b8c",
   "root": {
     "name": "k8s-microservices"
   },
   "nodes": [
+    {
+      "id": "boundary:k8s/prod/prod",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "prod",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "namespace": "prod",
+        "orchestrator": "kubernetes"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4
+        },
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/checkout.yaml",
+          "line": 4
+        },
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 4
+        },
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 26
+        },
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/ingress.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
     {
       "id": "cloud_resource:k8s/prod/public",
       "kind": "cloud_resource",
@@ -217,6 +259,86 @@
   ],
   "edges": [
     {
+      "id": "e:52039424b50b",
+      "from": "boundary:k8s/prod/prod",
+      "to": "cloud_resource:k8s/prod/public",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/ingress.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
+        }
+      ]
+    },
+    {
+      "id": "e:a53ac5c74dfd",
+      "from": "boundary:k8s/prod/prod",
+      "to": "datastore:k8s/prod/orders-db",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
+        }
+      ]
+    },
+    {
+      "id": "e:e520872b1918",
+      "from": "boundary:k8s/prod/prod",
+      "to": "datastore:k8s/prod/session-cache",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 26,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
+        }
+      ]
+    },
+    {
+      "id": "e:004b8558baac",
+      "from": "boundary:k8s/prod/prod",
+      "to": "service:k8s/prod/api-gateway",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
+        }
+      ]
+    },
+    {
+      "id": "e:fbd7a0d1e848",
+      "from": "boundary:k8s/prod/prod",
+      "to": "service:k8s/prod/checkout",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/checkout.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
+        }
+      ]
+    },
+    {
       "id": "e:12a90f37ed2f",
       "from": "cloud_resource:k8s/prod/public",
       "to": "service:k8s/prod/api-gateway",
@@ -362,8 +484,8 @@
   "stats": {
     "filesScanned": 4,
     "filesParsed": 4,
-    "nodeCount": 8,
-    "edgeCount": 7,
+    "nodeCount": 9,
+    "edgeCount": 12,
     "durationMs": 0
   }
 }

@@ -509,11 +509,72 @@ spec:
     spec:
       containers: [{name: pg, image: postgres:16}]
 `)
-	if len(c.nodes) != 2 {
-		t.Errorf("got %d nodes, want 2 (the Service is an alias)", len(c.nodes))
+	// Two workloads, plus the namespace boundary each declares itself into.
+	// The boundary is emitted once per member and merged downstream, so the
+	// raw count sees it twice.
+	var workloads, boundaries int
+	for _, n := range c.nodes {
+		if n.Kind == schema.KindBoundary {
+			boundaries++
+			continue
+		}
+		workloads++
+	}
+	if workloads != 2 {
+		t.Errorf("got %d workloads, want 2 (the Service is an alias)", workloads)
+	}
+	if boundaries == 0 {
+		t.Error("no namespace boundary was emitted; a manifest repository would have no hierarchy")
 	}
 	if len(c.aliases) != 2 {
 		t.Errorf("got %d aliases, want 2", len(c.aliases))
+	}
+}
+
+// TestNamespaceBoundaryEnclosesItsWorkloads is what a C4 view is built on: a
+// system you can open to see its containers.
+//
+// Compose emits a boundary per project and Helm one per chart, but plain
+// manifests produced a flat list with nothing enclosing it, so a diagram
+// drawn from the most common repository shape had no level to zoom out to.
+func TestNamespaceBoundaryEnclosesItsWorkloads(t *testing.T) {
+	c := extract(t, "deploy.yaml", `
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: api, namespace: prod}
+spec:
+  template:
+    spec:
+      containers: [{name: api, image: ghcr.io/acme/api:1}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: worker, namespace: prod}
+spec:
+  template:
+    spec:
+      containers: [{name: worker, image: ghcr.io/acme/worker:1}]
+`)
+
+	var contained []string
+	for _, e := range c.edges {
+		if e.Kind == schema.EdgeContains {
+			contained = append(contained, e.To)
+		}
+	}
+	if len(contained) != 2 {
+		t.Fatalf("got %d contains edges, want one per workload: %v", len(contained), contained)
+	}
+	for _, e := range c.edges {
+		if e.Kind != schema.EdgeContains {
+			continue
+		}
+		if !strings.HasPrefix(e.From, "boundary:") {
+			t.Errorf("a contains edge starts at %q, which is not a boundary", e.From)
+		}
+		if e.Confidence != schema.ConfDeclared {
+			t.Errorf("namespace membership is declared, not inferred: got %v", e.Confidence)
+		}
 	}
 }
 

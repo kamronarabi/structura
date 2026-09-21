@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -30,6 +31,11 @@ var buildBinary = sync.OnceValues(func() (string, error) {
 		return "", err
 	}
 	bin := filepath.Join(dir, "structura")
+	if runtime.GOOS == "windows" {
+		// Windows will not execute a file without a recognised extension,
+		// and go build writes structura.exe regardless of what -o asks for.
+		bin += ".exe"
+	}
 	cmd := exec.Command("go", "build", "-o", bin, "./../../cmd/structura")
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {

@@ -407,12 +407,17 @@ func TestUnknownClientListsTheKnownOnes(t *testing.T) {
 }
 
 func TestEveryClientHasAScope(t *testing.T) {
+	// "/repo" and "/home" are absolute on Unix but rooted-relative on
+	// Windows, where an absolute path needs a volume name. TempDir is
+	// absolute on every platform, so the IsAbs assertion below tests the
+	// client's path building rather than the literals used to drive it.
+	repo, home := filepath.Join(t.TempDir(), "repo"), filepath.Join(t.TempDir(), "home")
 	for _, c := range ideconfig.Clients() {
 		if len(c.Scopes()) == 0 {
 			t.Errorf("%s has no usable scope", c.Name)
 		}
 		for _, scope := range c.Scopes() {
-			path, err := c.ConfigPath(scope, "/repo", "/home")
+			path, err := c.ConfigPath(scope, repo, home)
 			if err != nil {
 				t.Errorf("%s %s: %v", c.Name, scope, err)
 			}

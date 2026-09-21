@@ -288,7 +288,7 @@ func TestInstallMCPVSCodeUsesItsOwnShape(t *testing.T) {
 func TestInstallMCPGlobalScopeDoesNotPinARepository(t *testing.T) {
 	root, binary := repoWithBinary(t)
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHomeDir(t, home)
 
 	code, out, errOut := run(t, "install-mcp", "--client", "cursor", "--scope", "global",
 		"-C", root, "--binary", binary)
@@ -343,4 +343,17 @@ func TestInstallMCPProjectScopeStillPinsTheRepository(t *testing.T) {
 	if !strings.Contains(string(data), "--root") {
 		t.Errorf("a project config did not pin its own repository:\n%s", data)
 	}
+}
+
+// setHomeDir redirects os.UserHomeDir through the environment.
+//
+// Go reads USERPROFILE on Windows and HOME everywhere else, so setting HOME
+// alone left install-mcp writing into the real user profile on Windows while
+// the test read an empty temp directory. That is worse than a failing test:
+// running the suite on a Windows machine rewrote the developer's actual
+// Cursor config.
+func setHomeDir(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
 }
