@@ -29,8 +29,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -40,6 +42,7 @@ import (
 
 	"github.com/kamronarabi/structura/internal/mcpserver"
 	"github.com/kamronarabi/structura/internal/scan/extractors"
+	"github.com/kamronarabi/structura/pkg/schema"
 )
 
 // Suite is the question file.
@@ -165,6 +168,12 @@ func run(questionsPath, fixtureDir, model, only string, maxTurns int, verbose bo
 			sessions[q.Fixture] = session
 		}
 
+		// Validated before the call, not after: a bad question costs money
+		// and produces a failure that looks like a product defect.
+		if err := validateQuestion(ctx, session, q); err != nil {
+			return fmt.Errorf("question %s: %w", q.ID, err)
+		}
+
 		started := time.Now()
 		result := ask(ctx, &client, session, model, q, maxTurns)
 		result.Elapsed = time.Since(started)
@@ -174,6 +183,96 @@ func run(questionsPath, fixtureDir, model, only string, maxTurns int, verbose bo
 	}
 
 	return report(results)
+}
+
+// validateQuestion rejects a must_not_mention term that names a real
+// component in the graph being asked about.
+//
+// Such a term cannot be checked by substring matching: the model will
+// legitimately name that component while excluding it, and the check will
+// read the exclusion as an assertion. Catching this when the suite loads,
+// rather than as a mysterious failure after paying for the call, is the
+// difference between a harness that measures the tool surface and one that
+// measures its own phrasing.
+func validateQuestion(ctx context.Context, session *mcp.ClientSession, q Question) error {
+	names, err := componentNames(ctx, session)
+	if err != nil {
+		return err
+	}
+	for _, forbidden := range q.MustNotMention {
+		for _, alt := range strings.Split(forbidden, "|") {
+			alt = strings.ToLower(strings.TrimSpace(alt))
+			if commonWords[alt] {
+				return fmt.Errorf("must_not_mention lists %q, which is too ordinary a word to forbid.\n"+
+					"It will match inside other words and inside correct negations. "+
+					"Forbid only names a model could invent", alt)
+			}
+			if names[alt] {
+				return fmt.Errorf("must_not_mention lists %q, which is a real component in %s.\n"+
+					"A substring check cannot tell \"%s is the answer\" from \"%s is not the answer\", "+
+					"so a correct answer that rules it out would be scored as a failure.\n"+
+					"Use must_not_mention only for things absent from the graph; put the "+
+					"attribution in must_mention instead (for example \"only\" or \"no\")",
+					alt, q.Fixture, alt, alt)
+			}
+		}
+	}
+	return nil
+}
+
+// componentNames returns every node name and id in the served graph, lowered.
+func componentNames(ctx context.Context, session *mcp.ClientSession) (map[string]bool, error) {
+	res, err := session.ReadResource(ctx, &mcp.ReadResourceParams{URI: mcpserver.GraphResourceURI})
+	if err != nil {
+		return nil, fmt.Errorf("reading the graph: %w", err)
+	}
+	if len(res.Contents) == 0 {
+		return nil, errors.New("the graph resource returned nothing")
+	}
+	// Decoded through the real schema type rather than a hand-rolled struct,
+	// so a change to the graph format shows up as a compile error here
+	// instead of as a silently empty set that disables the check.
+	graph, err := schema.Unmarshal([]byte(res.Contents[0].Text))
+	if err != nil {
+		return nil, fmt.Errorf("parsing the graph: %w", err)
+	}
+	names := make(map[string]bool, len(graph.Nodes)*4)
+	add := func(s string) {
+		if s != "" {
+			names[strings.ToLower(s)] = true
+		}
+	}
+	for _, n := range graph.Nodes {
+		add(n.Name)
+		add(n.ID)
+		if n.Tech != nil {
+			add(n.Tech.Language)
+			add(n.Tech.Runtime)
+			add(n.Tech.Framework)
+		}
+		// A node named "search" running elasticsearch:8.13.0 gets described
+		// as elasticsearch, so forbidding that word has exactly the same
+		// problem as forbidding the node's own name.
+		if image, ok := n.Attrs["image"].(string); ok {
+			base := image
+			if i := strings.LastIndex(base, "/"); i >= 0 {
+				base = base[i+1:]
+			}
+			base, _, _ = strings.Cut(base, ":")
+			add(base)
+		}
+	}
+	return names, nil
+}
+
+// commonWords are too ordinary to forbid.
+//
+// "no" appears in "not" and "cannot"; a model that correctly answers "no"
+// would fail a check meant to stop it inventing a component. A term this
+// generic is always an attribution check wearing the wrong hat.
+var commonWords = map[string]bool{
+	"no": true, "not": true, "none": true, "yes": true, "all": true,
+	"any": true, "directly": true, "direct": true, "nothing": true,
 }
 
 // openFixture starts a server over an in-memory transport, which exercises
@@ -211,7 +310,7 @@ func ask(ctx context.Context, client *anthropic.Client, session *mcp.ClientSessi
 
 	for turn := 0; turn < maxTurns; turn++ {
 		msg, err := client.Messages.New(ctx, anthropic.MessageNewParams{
-			Model:     anthropic.Model(model),
+			Model:     model,
 			MaxTokens: 2048,
 			System:    []anthropic.TextBlockParam{{Text: systemPrompt}},
 			Messages:  messages,
@@ -261,14 +360,14 @@ func bridgeTools(ctx context.Context, session *mcp.ClientSession) ([]anthropic.T
 		if err != nil {
 			return nil, fmt.Errorf("%s: marshaling its schema: %w", tool.Name, err)
 		}
-		var schema struct {
+		var decoded struct {
 			Properties any      `json:"properties"`
 			Required   []string `json:"required"`
 		}
-		if err := json.Unmarshal(raw, &schema); err != nil {
+		if err := json.Unmarshal(raw, &decoded); err != nil {
 			return nil, fmt.Errorf("%s: reading its schema: %w", tool.Name, err)
 		}
-		properties := schema.Properties
+		properties := decoded.Properties
 		if properties == nil {
 			properties = map[string]any{}
 		}
@@ -277,7 +376,7 @@ func bridgeTools(ctx context.Context, session *mcp.ClientSession) ([]anthropic.T
 			Description: anthropic.String(tool.Description),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: properties,
-				Required:   schema.Required,
+				Required:   decoded.Required,
 			},
 		}})
 	}
@@ -309,6 +408,14 @@ func callTool(ctx context.Context, session *mcp.ClientSession, name string, inpu
 // A substring match is crude, and deliberately so: the alternative is a model
 // grading a model, which introduces a second source of nondeterminism into a
 // harness whose whole job is to be a stable signal.
+//
+// The crudeness has one sharp edge, and validateQuestion guards it.
+// must_not_mention can only ask "does this string appear at all", which is
+// the right question for a component that does not exist and the wrong one
+// for a component that does. A good answer to "which service uses Redis"
+// names the others while ruling them out — and a substring check reads that
+// as the model naming them. Scoring it as a failure penalizes exactly the
+// caveats the system prompt asks for.
 func grade(answer string, q Question) (missing, invented []string) {
 	lower := strings.ToLower(answer)
 	for _, fact := range q.MustMention {
@@ -323,15 +430,36 @@ func grade(answer string, q Question) (missing, invented []string) {
 			missing = append(missing, fact)
 		}
 	}
+	// Forbidden terms match on word boundaries. A plain substring check would
+	// find "sqs" inside a longer identifier and "no" inside "cannot", which
+	// makes short but legitimate terms unusable and turns correct answers
+	// into failures.
 	for _, forbidden := range q.MustNotMention {
 		for _, alt := range strings.Split(forbidden, "|") {
-			if strings.Contains(lower, strings.ToLower(strings.TrimSpace(alt))) {
+			alt = strings.TrimSpace(alt)
+			if alt == "" {
+				continue
+			}
+			if wordBoundary(alt).MatchString(answer) {
 				invented = append(invented, alt)
 				break
 			}
 		}
 	}
 	return missing, invented
+}
+
+// wordBoundary compiles a case-insensitive whole-word matcher, cached because
+// the same terms recur across a run.
+var boundaryCache sync.Map
+
+func wordBoundary(term string) *regexp.Regexp {
+	if cached, ok := boundaryCache.Load(term); ok {
+		return cached.(*regexp.Regexp)
+	}
+	re := regexp.MustCompile(`(?i)(^|[^\w-])` + regexp.QuoteMeta(term) + `($|[^\w-])`)
+	boundaryCache.Store(term, re)
+	return re
 }
 
 func printProgress(r Result, verbose bool) {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-20T23:12:29Z",
+  "generatedAt": "2026-09-21T02:44:08Z",
   "contentHash": "sha256:21b037c950861a15cfc29b6b365b4561ef274e6e2f51137deadfbf0c548d9153",
   "root": {
     "name": "k8s-microservices"
@@ -364,6 +364,6 @@
     "filesParsed": 4,
     "nodeCount": 8,
     "edgeCount": 7,
-    "durationMs": 0
+    "durationMs": 2
   }
 }

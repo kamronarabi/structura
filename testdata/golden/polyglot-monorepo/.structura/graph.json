@@ -1,6 +1,6 @@
 {
   "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-20T23:12:29Z",
+  "generatedAt": "2026-09-21T02:44:08Z",
   "contentHash": "sha256:db462e6914c5d5463d334b9ac8acdae1f1e4fd94cc52d094e5a9f2108ad86627",
   "root": {
     "name": "polyglot-monorepo"
@@ -405,6 +405,6 @@
     "filesParsed": 5,
     "nodeCount": 8,
     "edgeCount": 9,
-    "durationMs": 5
+    "durationMs": 7
   }
 }

@@ -26,6 +26,9 @@ build:
 .PHONY: test
 test:
 	go test ./... -short
+# The eval harness's grader decides whether a release-gating run passes, so it
+# is unit-tested like anything else. These tests make no API calls.
+	go test -tags eval ./internal/devtools/eval/...
 
 ## test-race: full suite under the race detector
 .PHONY: test-race
@@ -43,6 +46,13 @@ golden:
 lint:
 	go vet ./...
 	golangci-lint run ./...
+# The corpus and eval packages sit behind build tags, so the sweep above never
+# compiles them. Left unchecked they rot quietly and only break on the day
+# someone needs them.
+	go vet -tags corpus ./internal/resolve/...
+	go vet -tags eval ./internal/devtools/eval/...
+	golangci-lint run --build-tags corpus ./internal/resolve/...
+	golangci-lint run --build-tags eval ./internal/devtools/eval/...
 
 ## fmt: apply formatting and import grouping
 .PHONY: fmt

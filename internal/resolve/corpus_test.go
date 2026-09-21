@@ -71,7 +71,7 @@ func TestResolverPrecisionOnCorpus(t *testing.T) {
 
 	var report strings.Builder
 	report.WriteString("\n")
-	report.WriteString(fmt.Sprintf("%-22s %-11s %-11s %s\n", "REPO", "PRECISION", "RECALL", "DETAIL"))
+	fmt.Fprintf(&report, "%-22s %-11s %-11s %s\n", "REPO", "PRECISION", "RECALL", "DETAIL")
 	report.WriteString(strings.Repeat("-", 92) + "\n")
 
 	var failures []string
@@ -92,9 +92,9 @@ func TestResolverPrecisionOnCorpus(t *testing.T) {
 		}
 
 		score := scoreRepo(t, root, want)
-		report.WriteString(fmt.Sprintf("%-22s %-11.2f %-11.2f %d found, %d wrong, %d missed\n",
+		fmt.Fprintf(&report, "%-22s %-11.2f %-11.2f %d found, %d wrong, %d missed\n",
 			want.Repo, score.precision, score.recall,
-			score.found, len(score.falsePositives), len(score.missed)))
+			score.found, len(score.falsePositives), len(score.missed))
 
 		if score.precision < PrecisionGate {
 			failures = append(failures, fmt.Sprintf(

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-20T23:12:29Z",
+  "generatedAt": "2026-09-21T02:44:08Z",
   "contentHash": "sha256:b880e38369f28dfaa3179edf37884f835926112a3ea92ff1e138f4b58fbf14d5",
   "root": {
     "name": "terraform-serverless"
@@ -408,6 +408,6 @@
     "filesParsed": 2,
     "nodeCount": 11,
     "edgeCount": 6,
-    "durationMs": 0
+    "durationMs": 2
   }
 }
