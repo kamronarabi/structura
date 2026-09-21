@@ -17,3 +17,29 @@ projects:
   - testdata/golden/polyglot-monorepo
   - testdata/golden/react-supabase
   - testdata/golden/terraform-serverless
+
+# Corrections. Everything else in this file's sibling graph is inference over
+# configuration files, and inference is wrong sometimes; these are the facts
+# that override it. A rule here is the answer, not a hint.
+#
+# relationships:
+#   # A dependency that exists only in application code, which a configuration
+#   # scan cannot see. It lands with confidence 1.00 and the note as evidence.
+#   - from: checkout          # a name, "name.namespace", or a full node id
+#     to: orders-db
+#     kind: persists_to       # calls, persists_to, publishes_to, subscribes_to,
+#                             # depends_on, exposes, contains
+#     note: pool built in checkout/internal/store.go
+#
+#   # An edge inference got wrong.
+#   - from: web
+#     to: api.stripe.com
+#     remove: true
+#
+# components:
+#   # Two boxes that are one component. The first survives.
+#   - same: [api.prod, acme/api]
+#     note: one service; the basename join will not cross packages/a
+#
+# A rule that matches nothing is reported as a gap rather than ignored, so a
+# correction cannot quietly go stale.

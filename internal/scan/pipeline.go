@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/kamronarabi/structura/internal/buildinfo"
+	"github.com/kamronarabi/structura/internal/override"
 	"github.com/kamronarabi/structura/internal/project"
 	"github.com/kamronarabi/structura/internal/resolve"
 	"github.com/kamronarabi/structura/pkg/schema"
@@ -34,6 +35,11 @@ type Options struct {
 	// repository whose boundaries detection cannot see. Empty means detect,
 	// and detection defaults to treating the repository as one project.
 	Projects []string
+
+	// Overrides are the corrections the repository declares: relationships
+	// configuration does not express, relationships inference got wrong, and
+	// components it drew twice. They are applied last and they win.
+	Overrides override.Rules
 
 	// KeepIntermediate retains the pre-resolution output for --debug-dump.
 	// It is off by default because it holds every hint in memory, including
@@ -177,11 +183,19 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 	// Detection cannot split a repository safely, but it can ask. Without
 	// this the boundary machinery only helps people who already knew they
 	// needed it.
+	// OVERRIDE: what the repository declared outright, over what was
+	// inferred. After resolution, because a declared relationship may name a
+	// component that only exists once resolution has finished; before the
+	// graph is built, so the corrected content is what gets hashed and
+	// validated rather than being patched into a finished graph.
+	corrected, overrideDiags := override.Apply(resolved.Nodes, resolved.Edges, opts.Overrides)
+	diags = append(diags, overrideDiags...)
+
 	builder := schema.NewBuilder()
-	for _, n := range resolved.Nodes {
+	for _, n := range corrected.Nodes {
 		builder.AddNode(n)
 	}
-	for _, e := range resolved.Edges {
+	for _, e := range corrected.Edges {
 		builder.AddEdge(e)
 	}
 	for _, d := range aggregateDiagnostics(diags) {

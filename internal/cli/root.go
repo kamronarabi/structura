@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/kamronarabi/structura/internal/buildinfo"
+	"github.com/kamronarabi/structura/internal/override"
 )
 
 // Options holds settings shared by every subcommand, populated from flags,
@@ -28,6 +29,11 @@ type Options struct {
 	// repository is one project. See internal/project for why this is
 	// declared rather than detected.
 	Projects []string
+
+	// Overrides are the corrections the config file declares: relationships
+	// the configuration does not express, relationships inference got wrong,
+	// and components it drew twice. See internal/override.
+	Overrides override.Rules
 }
 
 const (
@@ -124,10 +130,13 @@ func initConfig(cmd *cobra.Command, opts *Options, cfgFile string) error {
 	if !cmd.Flags().Changed("verbose") && v.IsSet("verbose") {
 		opts.Verbose = v.GetBool("verbose")
 	}
-	// Projects have no flag: a repository's boundaries are a property of the
+	// Projects and overrides have no flags: they are properties of the
 	// repository, not of one invocation, so they belong in the file that is
 	// committed alongside it.
 	opts.Projects = v.GetStringSlice("projects")
+	if err := v.Unmarshal(&opts.Overrides); err != nil {
+		return fmt.Errorf("reading corrections from config: %w", err)
+	}
 	return nil
 }
 
