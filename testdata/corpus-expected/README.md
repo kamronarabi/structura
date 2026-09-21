@@ -20,13 +20,22 @@ inventing edges — it is scoping: writing down the relationships the tool can
 see and omitting the ones it cannot, which turns recall into a measurement of
 the author's imagination.
 
-That happened. online-boutique reported **recall 1.00** while missing seven
-real relationships, because this file did not mention them. Every instrumented
-service exports traces to the OpenTelemetry collector, declared in
-`helm-chart/templates/*.yaml` behind a conditional. Structura reads those
-files but does not render them, so it finds none of the seven — and the
-expectation file, written by the same person who knew that, quietly left them
-out. The collector sat in the graph as an isolated node with no explanation.
+That happened. online-boutique's file did not mention that the frontend reads
+`PACKAGING_SERVICE_URL`, and nothing else here would have noticed.
+
+The check turned up seven more the file had not mentioned: every instrumented
+service reads `COLLECTOR_SERVICE_ADDR`. Those went under `edges` on the
+strength of it, taking recall to 0.71 and blaming unrendered Helm — and that
+was wrong in a way worth recording. `helm-chart/values.yaml` sets
+`opentelemetryCollector.create: false`, the manifests comment the variables
+out, and the collector node exists only because the scan reads an opt-in
+Kustomize component. Rendering the chart produces none of the seven. The
+application *can* export traces; no deployment described in the repository
+receives them.
+
+Which is the lesson: a relationship derived from source says what the code is
+able to do, not what any deployment here does. The check is right to demand an
+answer and wrong to assume one.
 
 So where a repository ships application source, the same relationships are
 derived from it mechanically and compared against this file

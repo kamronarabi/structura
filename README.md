@@ -52,7 +52,7 @@ hand-written expectation files and are scored:
 
 | Repository | Precision | Recall |
 |---|---|---|
-| GoogleCloudPlatform/microservices-demo | 1.00 | 0.71 |
+| GoogleCloudPlatform/microservices-demo | 1.00 | 1.00 |
 | stefanprodan/podinfo | 1.00 | 1.00 |
 | Weaveworks Sock Shop | 1.00 | 0.07 |
 
@@ -63,10 +63,24 @@ harmful, because a model reasons on top of it.
 The expected edges are hand-written, so they are themselves checked against the
 application source rather than trusted: a service names its dependencies in
 environment variables, configuration supplies them, and the source consumes
-them — two statements of one fact, and Structura reads only one of them. That
-check is what corrected the microservices-demo figure. It had read 1.00 while
-missing seven real edges, because the expectations had been scoped, without
-anyone meaning to, to what the scanner could already see.
+them — two statements of one fact, and Structura reads only one of them. The
+check reads the other, and every relationship it derives has to be accounted
+for.
+
+On microservices-demo it derives twenty-four, and eight of them were not in the
+expectation file. One was a real omission: the frontend reads
+`PACKAGING_SERVICE_URL`. The other seven were the OpenTelemetry collector,
+which every instrumented service can export traces to and which no deployment
+in this repository wires up — `helm-chart/values.yaml` sets
+`opentelemetryCollector.create: false`, the manifests leave the variables
+commented out, and the collector appears at all only through an opt-in
+Kustomize component. That is a capability, not a dependency, and charging
+recall for it would have scored the resolver against a configuration the
+project does not ship.
+
+Both verdicts are written into the expectation file with their evidence. That
+is what the check is for: not to decide which it is, but to stop a finding
+being dropped without someone looking at it.
 
 The other four have no architecture to get right — a grab-bag of Kubernetes
 examples, a hundred unrelated Compose stacks, a Terraform module library, and
@@ -77,13 +91,8 @@ and what could not be read. The input is fixed by commit, so those numbers move
 only when Structura changes. That is stability, not correctness, and the
 distinction is deliberate.
 
-The two shortfalls are different kinds of gap, and only one of them is ours:
+One shortfall is left, and it is not one better inference would close:
 
-- **microservices-demo, 0.71.** Every instrumented service exports traces to an
-  OpenTelemetry collector, declared in `helm-chart/templates/` behind a
-  conditional. Structura reads those files but does not render Helm, so it
-  finds none of the seven. Rendering would close it, and the scan already says
-  so — `helm_unrendered` is in the diagnostics.
 - **Sock Shop, 0.07.** This is the honest counterexample, kept in the corpus
   for that reason. The repository is a deployment repository: its manifests
   declare the workloads but almost no addresses between them, and it contains

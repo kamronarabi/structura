@@ -24,9 +24,22 @@ import (
 // The bias it invites is not inventing edges. It is scoping: writing down the
 // relationships the tool can see and not the ones it cannot, which makes
 // recall a measurement of the author's imagination rather than of the
-// resolver. It happened. online-boutique reported recall 1.00 while missing
-// seven real relationships, because the expectation file did not mention
-// them.
+// resolver. It happened: online-boutique's expectation file did not mention
+// that the frontend reads PACKAGING_SERVICE_URL, and nothing else here would
+// have noticed.
+//
+// What the check turned up alongside it is the more instructive case. Seven
+// services read COLLECTOR_SERVICE_ADDR. Taking that at face value moved seven
+// edges into `edges` and recall to 0.71 -- against a collector that
+// helm-chart/values.yaml disables, the manifests comment out, and only an
+// opt-in Kustomize component deploys. A relationship derived from source is
+// evidence that the application can do something, not that any deployment
+// described here does.
+//
+// So this fails on an unaccounted finding, not on a missing edge. Which one it
+// is -- a real dependency, or a capability nothing wires up -- is a judgement,
+// and it belongs in the expectation file next to the evidence for it. What
+// must not happen is the finding being dropped without anyone reaching one.
 //
 // So this derives the same relationships from a source Structura does not
 // read: the application code. A twelve-factor service names its dependencies
