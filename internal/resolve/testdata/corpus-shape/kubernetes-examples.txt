@@ -29,4 +29,5 @@ kubernetes-examples
     info service_selects_many          9
     info unmatched_service_selector    12
     info unresolved_reference          6
+    info unsupported_format            1
     warn k8s_parse_failed              10

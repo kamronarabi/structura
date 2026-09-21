@@ -31,4 +31,5 @@ awesome-compose
   diagnostics
     info env_placeholder_reference     1
     info unresolved_reference          1
+    info unsupported_format            1
     warn compose_parse_failed          1
