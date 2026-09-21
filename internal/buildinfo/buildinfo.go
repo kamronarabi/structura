@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/debug"
+	"strings"
 
 	"github.com/kamronarabi/structura/pkg/schema"
 )
@@ -104,4 +105,35 @@ func orNA(s string) string {
 		return "n/a"
 	}
 	return s
+}
+
+// BuildID identifies the build, for stamping into a graph so that a reader
+// can tell whether the code that produced it is the code running now.
+//
+// The commit is included even for a release, because a version string is
+// chosen by a human and a commit is not. A build made outside a VCS falls
+// back to whatever version it was given, which may identify nothing -- that
+// is a real limit, and a reader treating an unrecognized id as "rescan"
+// handles it correctly.
+//
+// Two builds from the same dirty tree produce the same id. Distinguishing
+// them would need a hash of the binary, and the cost of being wrong here is
+// one stale graph on a development machine, not a wrong answer in a release.
+func BuildID() string {
+	id := version
+	if commit != "" {
+		short := commit
+		if len(short) > 12 {
+			short = short[:12]
+		}
+		if id == "" || id == "dev" {
+			id = "dev+" + short
+		} else if !strings.Contains(id, short) {
+			id += "+" + short
+		}
+	}
+	if dirty {
+		id += "-dirty"
+	}
+	return id
 }

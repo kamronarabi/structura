@@ -1,7 +1,11 @@
 {
-  "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-21T04:27:11Z",
-  "contentHash": "sha256:93b4a969fe18b146b9356a74aa85b77dc54280075ca2829e462a9b1295ab2d95",
+  "schemaVersion": "0.2.0",
+  "generatedAt": "2026-09-21T14:53:23Z",
+  "contentHash": "sha256:f81a4d345a2d859dcf9374e7190b3ad6f8b2e0469e0401f51634da818974a347",
+  "generator": {
+    "name": "structura",
+    "version": "e3f7343-dirty"
+  },
   "root": {
     "name": "react-supabase"
   },

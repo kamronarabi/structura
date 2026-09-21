@@ -1,0 +1,144 @@
+{
+  "schemaVersion": "0.2.0",
+  "generatedAt": "2026-09-20T14:22:31Z",
+  "contentHash": "sha256:e4307ac64078801bc0f9015c43e8a9c0da334ae6af961bad63f0722812a5750b",
+  "root": {
+    "name": "acme",
+    "vcs": {
+      "commit": "5bfd317",
+      "branch": "main",
+      "dirty": false
+    }
+  },
+  "nodes": [
+    {
+      "id": "datastore:compose/default/redis",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "redis",
+      "attrs": {
+        "image": "redis:7"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 22
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:k8s/prod/postgres",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "postgres",
+      "namespace": "prod",
+      "attrs": {
+        "image": "postgres:16",
+        "ports": [
+          5432
+        ]
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/db.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "external:resolver/net/api.stripe.com",
+      "kind": "external",
+      "layer": "context",
+      "name": "api.stripe.com",
+      "confidence": 0.8
+    },
+    {
+      "id": "service:k8s/prod/api-gateway",
+      "kind": "service",
+      "layer": "container",
+      "name": "api-gateway",
+      "namespace": "prod",
+      "tech": {
+        "language": "go",
+        "runtime": "container"
+      },
+      "attrs": {
+        "image": "ghcr.io/acme/api:1.2.0",
+        "ports": [
+          8080
+        ],
+        "replicas": 3
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api.yaml",
+          "line": 12
+        },
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 3
+        }
+      ],
+      "confidence": 1
+    }
+  ],
+  "edges": [
+    {
+      "id": "e:7d6ef5d74e4b",
+      "from": "service:k8s/prod/api-gateway",
+      "to": "datastore:k8s/prod/postgres",
+      "kind": "persists_to",
+      "protocol": "postgres",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "resolver",
+          "path": "deploy/prod/api.yaml",
+          "line": 30,
+          "rule": "env_host_match",
+          "detail": "env DATABASE_URL host 'postgres' matches Service postgres.prod"
+        }
+      ]
+    },
+    {
+      "id": "e:e34f7dd433c9",
+      "from": "service:k8s/prod/api-gateway",
+      "to": "external:resolver/net/api.stripe.com",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "resolver",
+          "path": "deploy/prod/api.yaml",
+          "line": 34,
+          "rule": "env_url_external",
+          "detail": "STRIPE_API=https://api.stripe.com"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warn",
+      "code": "helm_unrendered",
+      "path": "charts/api/templates",
+      "message": "18 Helm templates not rendered"
+    }
+  ],
+  "stats": {
+    "filesScanned": 1247,
+    "filesParsed": 38,
+    "nodeCount": 4,
+    "edgeCount": 2,
+    "connected": 3,
+    "clusters": 2,
+    "durationMs": 412
+  }
+}

@@ -1,7 +1,11 @@
 {
-  "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-21T04:16:14Z",
-  "contentHash": "sha256:493833643546c781d0ee642cf4d4b5f28e3510a82c50a9fc061fa680da4cc313",
+  "schemaVersion": "0.2.0",
+  "generatedAt": "2026-09-21T14:53:23Z",
+  "contentHash": "sha256:30b8ecae9fa3f3a4b5f2fbe12d89472d1d6b7d215ea4e369bc949e5b52272dfc",
+  "generator": {
+    "name": "structura",
+    "version": "e3f7343-dirty"
+  },
   "root": {
     "name": "polyglot-monorepo"
   },

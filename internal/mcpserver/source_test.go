@@ -132,3 +132,75 @@ func TestAPatchDifferenceDoesNotForceARescan(t *testing.T) {
 		t.Errorf("served schema %s; a patch difference triggered a rescan", g.SchemaVersion)
 	}
 }
+
+// A change to an extractor or the resolver alters what a scan finds while
+// leaving the schema version and every file in the repository untouched. The
+// schema check and the modification times both miss it, so a graph written by
+// the previous build went on being served -- a wrong answer with nothing to
+// distinguish it from a right one.
+//
+// This was not hypothetical: a cached graph written before a change to the
+// Terraform extractor was still being served afterwards, and reported three
+// fewer components than the same build produced on a fresh scan.
+func TestAGraphFromAnotherBuildIsRebuilt(t *testing.T) {
+	root := fixture(t, "compose-monolith")
+	if _, err := newSource(root).Graph(context.Background()); err != nil {
+		t.Fatalf("priming the stored graph: %v", err)
+	}
+
+	path := graphio.Path(root)
+	data, err := os.ReadFile(path) //nolint:gosec // test-controlled path
+	if err != nil {
+		t.Fatalf("reading the stored graph: %v", err)
+	}
+	stored, err := schema.Unmarshal(data)
+	if err != nil {
+		t.Fatalf("parsing the stored graph: %v", err)
+	}
+	if stored.Generator == nil || stored.Generator.Version == "" {
+		t.Fatal("the scan did not record what produced the graph")
+	}
+
+	// Rewrite the producer, leaving the schema version and every file alone,
+	// so the only thing that can trigger a rescan is the build identity.
+	rewritten := strings.Replace(string(data),
+		`"version": "`+stored.Generator.Version+`"`, `"version": "some-other-build"`, 1)
+	if rewritten == string(data) {
+		t.Fatal("could not rewrite the recorded producer")
+	}
+	if err := os.WriteFile(path, []byte(rewritten), 0o600); err != nil {
+		t.Fatalf("rewriting the stored graph: %v", err)
+	}
+	future := time.Now().Add(time.Hour)
+	if err := os.Chtimes(path, future, future); err != nil {
+		t.Fatalf("dating the stored graph: %v", err)
+	}
+
+	g, err := newSource(root).Graph(context.Background())
+	if err != nil {
+		t.Fatalf("loading the graph: %v", err)
+	}
+	if g.Generator == nil || g.Generator.Version != stored.Generator.Version {
+		t.Errorf("served a graph from another build: %+v", g.Generator)
+	}
+}
+
+// Provenance is not architecture. Two builds that find the same thing
+// describe the same system, so recording which one ran must not change the
+// content hash -- otherwise every release would register as drift.
+func TestTheProducerDoesNotChangeTheContentHash(t *testing.T) {
+	root := fixture(t, "compose-monolith")
+	g, err := newSource(root).Graph(context.Background())
+	if err != nil {
+		t.Fatalf("loading the graph: %v", err)
+	}
+
+	other := g
+	other.Generator = &schema.Generator{Name: "structura", Version: "some-other-build"}
+	other.Normalize()
+
+	if other.ContentHash != g.ContentHash {
+		t.Errorf("the recorded producer changed the content hash:\n  %s\n  %s",
+			g.ContentHash, other.ContentHash)
+	}
+}

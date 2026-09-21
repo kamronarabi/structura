@@ -23,7 +23,7 @@ func TestSchemaSerializationIsPinned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	golden.Assert(t, filepath.Join("testdata", "golden", "graph-v0.1.json"), out)
+	golden.Assert(t, filepath.Join("testdata", "golden", "graph.json"), out)
 
 	if g.SchemaVersion != schema.Version {
 		t.Errorf("SchemaVersion = %q, want %q", g.SchemaVersion, schema.Version)

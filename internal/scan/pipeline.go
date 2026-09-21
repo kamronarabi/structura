@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/kamronarabi/structura/internal/buildinfo"
 	"github.com/kamronarabi/structura/internal/resolve"
 	"github.com/kamronarabi/structura/pkg/schema"
 )
@@ -177,6 +178,9 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 	// "nothing is serialized without this step" is.
 	resolve.RedactGraph(&graph)
 
+	// Stamped here rather than in the builder, because pkg/schema is the
+	// public API and must not depend on this binary's build metadata.
+	graph.Generator = &schema.Generator{Name: "structura", Version: buildinfo.BuildID()}
 	graph.GeneratedAt = time.Now().UTC().Truncate(time.Second)
 	graph.Stats.DurationMs = time.Since(started).Milliseconds()
 	graph.Normalize()

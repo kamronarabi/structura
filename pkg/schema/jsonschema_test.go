@@ -80,7 +80,7 @@ func TestGoldenGraphValidatesAgainstSchema(t *testing.T) {
 		t.Fatalf("compiling %s: %v", schemaFile, err)
 	}
 
-	graphBytes, err := os.ReadFile(filepath.Join("testdata", "golden", "graph-v0.1.json"))
+	graphBytes, err := os.ReadFile(filepath.Join("testdata", "golden", "graph.json"))
 	if err != nil {
 		t.Fatalf("reading golden graph: %v", err)
 	}

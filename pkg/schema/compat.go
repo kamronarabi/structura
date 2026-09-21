@@ -49,16 +49,17 @@ import (
 // # Phase 2
 //
 // Phase 2 adds component-layer nodes, call edges between them, and finer
-// source locations. That is a minor bump to 0.2.0, not a break: LayerComponent
-// and EdgeCalls are already defined and already validate, Attrs is an open
-// map, and Source already carries a path and a line.
+// source locations. That is a minor bump, not a break: LayerComponent and
+// EdgeCalls are already defined and already validate, Attrs is an open map,
+// and Source already carries a path and a line.
 //
 // Fields are not reserved speculatively. An unused field in the published
 // JSON Schema is a promise about a design that does not exist yet, and
 // withdrawing it later is precisely the major break this policy is meant to
 // avoid. Phase 2 adds what Phase 2 turns out to need, and bumps the minor
-// when it does.
-const Version = "0.1.0"
+// when it does -- to whatever the next minor is by then, which is why no
+// number is written down here.
+const Version = "0.2.0"
 
 // Relation describes how one schema version stands to another.
 type Relation string

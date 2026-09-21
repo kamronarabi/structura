@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kamronarabi/structura/internal/buildinfo"
 	"github.com/kamronarabi/structura/internal/graphio"
 	"github.com/kamronarabi/structura/internal/scan"
 	"github.com/kamronarabi/structura/pkg/schema"
@@ -114,8 +115,34 @@ func (s *Source) isStale(ctx context.Context, stored schema.Graph) (stale bool, 
 		s.log.Warn("serving a graph from a newer schema; some of it is invisible to this build",
 			"stored", compat.Stored, "current", compat.Current,
 			"remedy", "upgrade structura, or delete .structura/graph.json to rebuild it")
+		return false, "", nil
+	}
+
+	// The schema version says what the format is, not what produced it. An
+	// extractor or resolver change alters what a scan finds while leaving
+	// both the format and the repository's files untouched -- so neither the
+	// check above nor the modification times below notice, and the stored
+	// graph goes on being served by a build that would now disagree with it.
+	// That is a wrong answer delivered with no sign of being one.
+	if id := buildinfo.BuildID(); generatorVersion(stored) != id {
+		return true, fmt.Sprintf("the stored graph was written by %s, this is %s",
+			orUnknown(generatorVersion(stored)), id), nil
 	}
 	return false, "", nil
+}
+
+func generatorVersion(g schema.Graph) string {
+	if g.Generator == nil {
+		return ""
+	}
+	return g.Generator.Version
+}
+
+func orUnknown(s string) string {
+	if s == "" {
+		return "an unidentified build"
+	}
+	return s
 }
 
 func (s *Source) rescan(ctx context.Context) (schema.Graph, error) {

@@ -77,6 +77,10 @@ func (g Graph) Canonical() Graph {
 	g.GeneratedAt = time.Time{}
 	g.Stats.DurationMs = 0
 	g.ContentHash = ""
+	// Provenance, not architecture. Two builds that find the same thing
+	// describe the same system and must agree on the hash, or every release
+	// would look like the architecture changed.
+	g.Generator = nil
 	return g
 }
 

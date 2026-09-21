@@ -1,7 +1,11 @@
 {
-  "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-21T04:16:14Z",
-  "contentHash": "sha256:996fc898418348dcbea937ae245757eff8d74651fa79c997608ad423c1916714",
+  "schemaVersion": "0.2.0",
+  "generatedAt": "2026-09-21T14:53:23Z",
+  "contentHash": "sha256:2569b6d83ad584e9859771b93dfa06554669cf07ef78d499834ffd6b3c922fba",
+  "generator": {
+    "name": "structura",
+    "version": "e3f7343-dirty"
+  },
   "root": {
     "name": "multi-environment"
   },

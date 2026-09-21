@@ -35,11 +35,32 @@ type Graph struct {
 	// found the same architecture, which is what drift detection compares.
 	ContentHash string `json:"contentHash"`
 
+	// Generator records what wrote this graph. SchemaVersion says what the
+	// format is; this says what produced it, and they are different
+	// questions. Two builds of the same CLI emit the same schemaVersion and
+	// can still disagree about the same repository, because an extractor
+	// changed between them -- so a reader with no way to tell them apart
+	// serves a stored graph that the code has already superseded.
+	//
+	// Cleared by Canonical: it is provenance, not architecture, and two
+	// builds that find the same thing should agree on the content hash.
+	Generator *Generator `json:"generator,omitempty"`
+
 	Root        Root         `json:"root"`
 	Nodes       []Node       `json:"nodes"`
 	Edges       []Edge       `json:"edges"`
 	Diagnostics []Diagnostic `json:"diagnostics"`
 	Stats       Stats        `json:"stats"`
+}
+
+// Generator names the tool that produced a graph.
+//
+// Version is opaque and compared only for equality: it identifies a build,
+// and what makes one build distinguishable from another is the producer's
+// business, not this package's.
+type Generator struct {
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
 }
 
 // Root identifies the scanned repository. It deliberately carries no absolute

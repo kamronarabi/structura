@@ -1,7 +1,11 @@
 {
-  "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-21T04:16:14Z",
-  "contentHash": "sha256:ea2539bfc7cf92b7679f584810fdd830272615075c3da762bbfd7eb0ecce524e",
+  "schemaVersion": "0.2.0",
+  "generatedAt": "2026-09-21T14:53:22Z",
+  "contentHash": "sha256:4d140c8282ddc1af332904d100333d1a3005302727965b7c070d980c8ca23973",
+  "generator": {
+    "name": "structura",
+    "version": "e3f7343-dirty"
+  },
   "root": {
     "name": "compose-monolith"
   },
@@ -423,6 +427,6 @@
     "edgeCount": 12,
     "connected": 7,
     "clusters": 1,
-    "durationMs": 7
+    "durationMs": 6
   }
 }

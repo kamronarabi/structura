@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://structura.dev/schema/sag-v0.1.0.json",
+  "$id": "https://structura.dev/schema/sag-v0.2.0.json",
   "$defs": {
     "Attrs": {
       "type": "object"
@@ -107,6 +107,21 @@
       "required": [
         "extractor",
         "rule"
+      ]
+    },
+    "Generator": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
       ]
     },
     "Node": {
@@ -280,6 +295,9 @@
     "contentHash": {
       "type": "string"
     },
+    "generator": {
+      "$ref": "#/$defs/Generator"
+    },
     "root": {
       "$ref": "#/$defs/Root"
     },
@@ -318,5 +336,5 @@
     "stats"
   ],
   "title": "Structura Architecture Graph",
-  "description": "Graph schema version 0.1.0. Versioned independently of the structura CLI."
+  "description": "Graph schema version 0.2.0. Versioned independently of the structura CLI."
 }

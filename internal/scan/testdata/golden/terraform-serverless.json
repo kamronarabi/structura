@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "0.1.0",
+  "schemaVersion": "0.2.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:726a242bc91c50d00b921c15430df430a3c3a8104ff1e11727e4b73b9915ba41",
+  "contentHash": "sha256:e702b8686ae08ee17c811f1f1aa6dcf83458c158c39309eae1e0a772cbee9b5a",
   "root": {
     "name": "terraform-serverless"
   },
