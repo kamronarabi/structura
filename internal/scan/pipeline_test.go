@@ -183,8 +183,20 @@ func TestScanOutputContainsNoAbsolutePaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(out), abs) || strings.Contains(string(out), os.Getenv("HOME")+"/") {
-		t.Errorf("an absolute path reached graph.json:\n%s", out)
+
+	leaks := []string{abs}
+	// os.Getenv("HOME") is empty on Windows, which would reduce the needle to
+	// "/" and match every node ID in the graph. UserHomeDir reads USERPROFILE
+	// there and HOME elsewhere. Both spellings of the separator are checked,
+	// because graph paths are slash-separated on every platform while the
+	// home directory is reported natively.
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		leaks = append(leaks, home+string(filepath.Separator), filepath.ToSlash(home)+"/")
+	}
+	for _, leak := range leaks {
+		if strings.Contains(string(out), leak) {
+			t.Errorf("an absolute path (%q) reached graph.json:\n%s", leak, out)
+		}
 	}
 	if res.Graph.Root.Name != "compose-monolith" {
 		t.Errorf("root name = %q, want the directory's base name only", res.Graph.Root.Name)
