@@ -50,6 +50,15 @@ type Identity struct {
 	// it as one silently refuses every edge from a repository whose services
 	// are not containerized, which is the opposite of the intent.
 	Scope string
+
+	// Project is the declared project this node belongs to, or "." when the
+	// repository is a single project, which is the usual case.
+	//
+	// Scope narrows a match within a project; Project decides whether two
+	// nodes describe parts of the same system at all. They are different
+	// questions, and answering both from the namespace is how a service in
+	// one stack came to absorb the codebase of another.
+	Project string
 }
 
 // scopeFromNamespace reports whether an extractor's namespace names a
@@ -143,6 +152,11 @@ func identityOf(n schema.Node) *Identity {
 	}
 	if dir, ok := n.Attrs["directory"].(string); ok {
 		id.Directory = dir
+	}
+	if proj, ok := n.Attrs["project"].(string); ok && proj != "" {
+		id.Project = proj
+	} else {
+		id.Project = "."
 	}
 	if ctx, ok := n.Attrs["buildContext"].(string); ok {
 		id.BuildContext = ctx

@@ -22,6 +22,11 @@ type Alias struct {
 	Name      string
 	Namespace string
 
+	// Project is the declared project the file that produced this alias
+	// belongs to. A Service in one project must not attach its DNS name to an
+	// identically named workload in another.
+	Project string
+
 	// DNS lists every form the alias is reachable by, most qualified first.
 	DNS []string
 

@@ -272,6 +272,25 @@ func filterInScope(idx *Index, candidates []string, namespace string) []string {
 	return out
 }
 
+// filterByProject keeps only the candidates belonging to a project. An empty
+// project means the caller could not say, and filters nothing.
+func filterByProject(idx *Index, candidates []string, proj string) []string {
+	if proj == "" {
+		return candidates
+	}
+	var out []string
+	for _, id := range candidates {
+		identity, ok := idx.Identity(id)
+		if !ok {
+			continue
+		}
+		if identity.Kind == schema.KindExternal || identity.Project == proj {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 func filterByNamespace(idx *Index, candidates []string, namespace string) []string {
 	var out []string
 	for _, id := range candidates {
@@ -323,10 +342,24 @@ func kindForEdge(kind schema.EdgeKind) schema.NodeKind {
 }
 
 func withoutSelf(idx *Index, candidates []string, self string) []string {
+	referrer, hasReferrer := idx.Identity(self)
+
 	out := make([]string, 0, len(candidates))
 	for _, id := range candidates {
 		if id == self {
 			continue
+		}
+		// A declared project boundary is absolute. Names repeat constantly
+		// between independent stacks in one repository -- "api", "web",
+		// "prod" -- and an edge across that boundary is fiction that scores
+		// exactly as high as a real one. External systems are shared: two
+		// projects may both call Stripe, and that is one Stripe.
+		if hasReferrer {
+			if other, ok := idx.Identity(id); ok &&
+				other.Kind != schema.KindExternal &&
+				other.Project != referrer.Project {
+				continue
+			}
 		}
 		// A boundary is a grouping -- a system, a Compose project, a chart --
 		// and takes part in the graph through contains edges only. Letting a

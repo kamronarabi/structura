@@ -41,11 +41,12 @@ type Result struct {
 // complete picture.
 func Resolve(in Input) Result {
 	r := &resolver{
-		index:  NewIndex(in.Nodes),
-		nodes:  cloneNodes(in.Nodes),
-		edges:  append([]schema.Edge(nil), in.Edges...),
-		byID:   map[string]*schema.Node{},
-		merges: map[string]string{},
+		index:        NewIndex(in.Nodes),
+		nodes:        cloneNodes(in.Nodes),
+		edges:        append([]schema.Edge(nil), in.Edges...),
+		byID:         map[string]*schema.Node{},
+		merges:       map[string]string{},
+		crossProject: map[string]bool{},
 	}
 	for i := range r.nodes {
 		r.byID[r.nodes[i].ID] = &r.nodes[i]
@@ -73,6 +74,9 @@ type resolver struct {
 	// merges maps a node that turned out to be the same component as another
 	// onto the one that survives.
 	merges map[string]string
+	// crossProject records basename joins refused because the two nodes live
+	// in different project trees, keyed "code\x00deployment".
+	crossProject map[string]bool
 }
 
 // applyAliases attaches names that route to a node, and synthesizes external
@@ -102,7 +106,10 @@ func (r *resolver) applyAliases(aliases []Alias) {
 func (r *resolver) selectorAlias(alias Alias) {
 	candidates := r.index.NodesBySelector(alias.Selector)
 	// A selector is scoped to its namespace; matching across namespaces
-	// would connect a dev Service to a prod Deployment.
+	// would connect a dev Service to a prod Deployment. It is scoped to its
+	// project for the same reason one step up: two projects each declaring a
+	// "prod" namespace are not one namespace.
+	candidates = filterByProject(r.index, candidates, alias.Project)
 	candidates = filterByNamespace(r.index, candidates, alias.Namespace)
 
 	switch len(candidates) {
@@ -125,7 +132,7 @@ func (r *resolver) selectorAlias(alias Alias) {
 
 // namedAlias resolves an alias that names its target outright.
 func (r *resolver) namedAlias(alias Alias) {
-	candidates := r.index.byName[strings.ToLower(alias.TargetName)]
+	candidates := filterByProject(r.index, r.index.byName[strings.ToLower(alias.TargetName)], alias.Project)
 	if scoped := filterByNamespace(r.index, candidates, alias.Namespace); len(scoped) > 0 {
 		candidates = scoped
 	}
@@ -221,6 +228,44 @@ func (r *resolver) mergeCodeIntoDeployments() {
 			})
 		}
 	}
+
+	r.reportCrossProjectJoins()
+}
+
+// reportCrossProjectJoins says which basename matches were refused.
+//
+// A refusal is not silence. The two nodes really do share a name, and a
+// reader looking at two boxes that they believe are one needs to know the
+// scan considered it and decided they were in different projects -- otherwise
+// the only visible outcome is a duplicate they cannot explain.
+//
+// Only refusals that left the codebase unmerged are worth saying: if some
+// other deployment in the right project claimed it, nothing is missing.
+func (r *resolver) reportCrossProjectJoins() {
+	keys := make([]string, 0, len(r.crossProject))
+	for key := range r.crossProject {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		code, deployment, ok := strings.Cut(key, "\x00")
+		if !ok {
+			continue
+		}
+		if _, merged := r.merges[code]; merged {
+			continue
+		}
+		r.diags = append(r.diags, schema.Diagnostic{
+			Severity: schema.SeverityInfo,
+			Code:     "code_join_crosses_projects",
+			Message: fmt.Sprintf(
+				"%s and %s share a name but sit in different project trees, so they were "+
+					"left as two components; if they are one, a build context or an image "+
+					"the manifest names would say so",
+				r.displayName(code), r.displayName(deployment)),
+		})
+	}
 }
 
 // codeByDirectoryBase indexes source components by the last segment of their
@@ -285,9 +330,17 @@ func (r *resolver) codeFor(deployment *Identity, byDirBase map[string][]string) 
 	var matches []string
 	for key := range keys {
 		for _, id := range byDirBase[key] {
-			if id != deployment.NodeID {
-				matches = append(matches, id)
+			if id == deployment.NodeID {
+				continue
 			}
+			// Filtered before the uniqueness check, not after: a candidate
+			// from another project is not a candidate at all, and counting
+			// it would let one unrelated stack suppress a correct join.
+			if !r.sameProjectTree(deployment.NodeID, id) {
+				r.crossProject[id+"\x00"+deployment.NodeID] = true
+				continue
+			}
+			matches = append(matches, id)
 		}
 	}
 	matches = dedupe(matches)
@@ -296,6 +349,115 @@ func (r *resolver) codeFor(deployment *Identity, byDirBase map[string][]string) 
 	}
 
 	return matches[0], true
+}
+
+// sameProjectTree reports whether a deployment and a codebase are near enough
+// in the tree for "they share a directory name" to mean they are one thing.
+//
+// The basename join is inference on a very common word. "worker", "web",
+// "api" and "app" name a directory in most repositories that have one, so in
+// a repository holding more than one project the join will find a match in a
+// project it has nothing to do with — and it did: a Compose service in one
+// sample stack absorbed the package.json of an unrelated stack three
+// directories away, and every dependency that codebase had moved with it.
+//
+// Two shapes are accepted, and both mean "one project":
+//
+// The file that declares the deployment sits at or above the code. A Compose
+// file at the repository root, or a chart beside the service it deploys,
+// governs everything beneath it.
+//
+// The two diverge at the repository root. This is how a single-project
+// repository is laid out — deploy/ beside src/, infra/ beside services/ —
+// and it is the case the basename join was written for.
+//
+// Anything else diverges below the root, which means a directory is grouping
+// several things, and a name matched across that grouping is a coincidence.
+//
+// All of that is the fallback. A repository that declares its projects gets
+// an exact answer instead, and none of these shapes are consulted.
+// The cost of being wrong here is not symmetric: refusing a real join draws
+// one component as two boxes, while accepting a false one silently moves a
+// service's dependencies onto someone else's service.
+//
+// The known cost is a project nested inside a directory that also holds its
+// code -- packages/a/deploy beside packages/a/src -- which loses the
+// inference and is drawn as two boxes. A build context still joins it, and
+// two boxes is the failure worth having.
+func (r *resolver) sameProjectTree(deploymentID, codeID string) bool {
+	codeNode, ok := r.byID[codeID]
+	if !ok {
+		return false
+	}
+
+	// A declared project boundary is the answer when there is one, and it is
+	// exact: no path heuristic runs, and nothing below this can overrule it.
+	// The path rules that follow are what a repository gets when it has not
+	// said where its projects are, which is the default.
+	if a, aok := r.index.Identity(deploymentID); aok {
+		if b, bok := r.index.Identity(codeID); bok && a.Project != b.Project {
+			return false
+		} else if bok && a.Project != "." && a.Project == b.Project {
+			return true
+		}
+	}
+	codeDir, _ := codeNode.Attrs["directory"].(string)
+	codeDir = normalizeDir(codeDir)
+
+	declaring := r.declaringDirs(deploymentID)
+	// A node with no recorded source cannot be placed, and refusing every
+	// join on that basis would disable the inference rather than narrow it.
+	if len(declaring) == 0 {
+		return true
+	}
+	for _, dir := range declaring {
+		if dir == codeDir || isAncestorDir(dir, codeDir) {
+			return true
+		}
+		if commonDirPrefix(dir, codeDir) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// declaringDirs returns the directories of the files that declared a node.
+func (r *resolver) declaringDirs(nodeID string) []string {
+	node, ok := r.byID[nodeID]
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, s := range node.Sources {
+		if s.Path == "" {
+			continue
+		}
+		out = appendUnique(out, normalizeDir(path.Dir(s.Path)))
+	}
+	return out
+}
+
+// isAncestorDir reports whether dir contains child, with "." meaning the
+// repository root and therefore containing everything.
+func isAncestorDir(dir, child string) bool {
+	if dir == "." {
+		return true
+	}
+	return strings.HasPrefix(child, dir+"/")
+}
+
+// commonDirPrefix counts the leading path segments two directories share. A
+// count of zero means they diverge at the repository root.
+func commonDirPrefix(a, b string) int {
+	if a == "." || b == "." {
+		return 0
+	}
+	as, bs := strings.Split(a, "/"), strings.Split(b, "/")
+	n := 0
+	for n < len(as) && n < len(bs) && as[n] == bs[n] {
+		n++
+	}
+	return n
 }
 
 // expandConfigMaps transfers a ConfigMap's references onto the workloads that
