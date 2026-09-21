@@ -164,7 +164,7 @@ func TestIsSecretKey(t *testing.T) {
 	}
 	for _, k := range secret {
 		if !resolve.IsSecretKey(k) {
-			t.Errorf("IsSecretKey(%q) = false, want true", k)
+			t.Errorf("resolve.IsSecretKey(%q) = false, want true", k)
 		}
 	}
 
@@ -177,7 +177,7 @@ func TestIsSecretKey(t *testing.T) {
 	}
 	for _, k := range notSecret {
 		if resolve.IsSecretKey(k) {
-			t.Errorf("IsSecretKey(%q) = true, want false", k)
+			t.Errorf("resolve.IsSecretKey(%q) = true, want false", k)
 		}
 	}
 }
@@ -255,4 +255,65 @@ func FuzzRedactString(f *testing.F) {
 			t.Fatalf("redaction is not idempotent:\n %q\n %q\n %q", value, once, twice)
 		}
 	})
+}
+
+// TestIsSecretKeyDoesNotMatchInsideOrdinaryWords guards the redactor's
+// appetite.
+//
+// Over-redaction is not a safe default here. The graph is built out of these
+// values, and an edge whose evidence reads *** cannot be checked by the
+// person it is shown to — which is the opposite of the claim the project
+// makes about every edge showing its work. This was found by scanning a real
+// repository: SHIPPING_SERVICE_ADDR contains "PIN".
+func TestIsSecretKeyDoesNotMatchInsideOrdinaryWords(t *testing.T) {
+	for _, key := range []string{
+		"SHIPPING_SERVICE_ADDR", // SHIP-PIN-G
+		"SHOPPING_CART_URL",     // SHOP-PIN-G
+		"PING_INTERVAL",         // PIN-G
+		"GRPC_PING_TIMEOUT",     // PIN-G
+		"MAPPING_FILE",          // MAP-PIN-G
+		"SPINNAKER_URL",         // S-PIN-NAKER
+		"AUTHOR_NAME",           // AUTH-OR
+		"AUTHORITY_URL",         // AUTH-ORITY
+		"shippingServiceAddr",   // the camelCase spelling of the same thing
+		"stepping_stone_host",   // STEP-PIN-G
+	} {
+		if resolve.IsSecretKey(key) {
+			t.Errorf("%q was treated as a credential; a trigger word inside an "+
+				"ordinary word is not a credential", key)
+		}
+	}
+}
+
+// TestIsSecretKeyStillCatchesCredentials is the other half: loosening the
+// match must not let a real secret through.
+func TestIsSecretKeyStillCatchesCredentials(t *testing.T) {
+	for _, key := range []string{
+		"DB_PASSWORD", "PASSWORD", "MYSQL_PASSWD",
+		"API_KEY", "APIKEY", "AWS_ACCESS_KEY_ID",
+		"JWT_SECRET", "CLIENT_SECRET", "DJANGO_SECRET_KEY",
+		"AUTH_TOKEN", "GITHUB_TOKEN", "AUTHORIZATION",
+		"AUTH", "SALT", "PIN", "PASSWORD_HASH_SALT",
+		"TLS_CERTIFICATE", "REQUEST_SIGNING_KEY", "SSH_PASSPHRASE",
+		"dbPassword", "apiKey", "clientSecret", // camelCase spellings
+		"db-password", "api-key", // kebab-case spellings
+	} {
+		if !resolve.IsSecretKey(key) {
+			t.Errorf("%q was not treated as a credential", key)
+		}
+	}
+}
+
+// TestSecretKeyExceptionsStillApply covers keys that carry a trigger word but
+// hold a location or a flag.
+func TestSecretKeyExceptionsStillApply(t *testing.T) {
+	for _, key := range []string{
+		"SECRET_NAME", "SECRET_ARN", "DB_SECRET_ARN",
+		"AUTH_URL", "AUTH_HOST", "AUTH_SERVICE", "AUTH_ENABLED",
+		"TOKEN_URL", "PRIVATE_KEY_PATH",
+	} {
+		if resolve.IsSecretKey(key) {
+			t.Errorf("%q names a location or a flag, not a credential", key)
+		}
+	}
 }

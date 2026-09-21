@@ -3,6 +3,7 @@ package resolve
 import (
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/kamronarabi/structura/pkg/schema"
 )
@@ -41,14 +42,27 @@ var (
 	pemBlock = regexp.MustCompile(`(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----`)
 )
 
-// secretKeyParts mark a configuration key whose value is a credential. The
-// whole value goes, not part of it: there is nothing in a password worth
+// secretKeySubstrings mark a configuration key whose value is a credential.
+// The whole value goes, not part of it: there is nothing in a password worth
 // keeping in an architecture graph.
-var secretKeyParts = []string{
+//
+// These are matched anywhere in the key, because each is long and
+// distinctive enough that an accidental match is implausible.
+var secretKeySubstrings = []string{
 	"PASSWORD", "PASSWD", "SECRET", "TOKEN", "APIKEY", "API_KEY",
 	"ACCESS_KEY", "PRIVATE_KEY", "CLIENT_SECRET", "CREDENTIAL",
-	"AUTH", "SALT", "SIGNING", "CERTIFICATE", "PASSPHRASE", "PIN",
+	"SIGNING", "CERTIFICATE", "PASSPHRASE",
 }
+
+// secretKeySegments are matched only as a whole delimited segment of the key.
+//
+// Each is short enough to occur inside an ordinary word. PIN appears in
+// SHIPPING, PING, MAPPING, SHOPPING and SPINNAKER; AUTH appears in AUTHOR
+// and AUTHORITY. Matched as substrings they blank out exactly the values the
+// graph is built from -- a SHIPPING_SERVICE_ADDR redacted to *** leaves an
+// edge whose evidence cannot be checked, which is worse than useless when
+// the whole claim is that every edge shows its work.
+var secretKeySegments = []string{"AUTH", "AUTHORIZATION", "SALT", "PIN"}
 
 // secretKeyExceptions are keys that contain a trigger word but hold a
 // location or a flag rather than a credential. Without these, redaction
@@ -63,7 +77,7 @@ var secretKeyExceptions = []string{
 
 // IsSecretKey reports whether a key's value should be masked outright.
 func IsSecretKey(key string) bool {
-	upper := strings.ToUpper(strings.TrimSpace(key))
+	upper := normalizeKey(key)
 	if upper == "" {
 		return false
 	}
@@ -72,12 +86,56 @@ func IsSecretKey(key string) bool {
 			return false
 		}
 	}
-	for _, part := range secretKeyParts {
+	for _, part := range secretKeySubstrings {
 		if strings.Contains(upper, part) {
 			return true
 		}
 	}
+	for _, segment := range keySegments(upper) {
+		for _, part := range secretKeySegments {
+			if segment == part {
+				return true
+			}
+		}
+	}
 	return false
+}
+
+// normalizeKey uppercases a key and reduces every separator to an
+// underscore, so that api-key, api.key and API_KEY are one spelling.
+//
+// Without this, the separator a project happens to use decides whether its
+// credentials are redacted.
+func normalizeKey(key string) string {
+	upper := strings.ToUpper(strings.TrimSpace(key))
+	return strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return r
+		}
+		return '_'
+	}, upper)
+}
+
+// keySegments splits a configuration key into its words, on both punctuation
+// and camelCase, so that DB_PASSWORD, db-password and dbPassword all yield
+// the same segments.
+func keySegments(key string) []string {
+	var spaced strings.Builder
+	runes := []rune(key)
+	for i, r := range runes {
+		if i > 0 && unicode.IsUpper(r) &&
+			(unicode.IsLower(runes[i-1]) || unicode.IsDigit(runes[i-1])) {
+			spaced.WriteByte('_')
+		}
+		spaced.WriteRune(r)
+	}
+	segments := strings.FieldsFunc(spaced.String(), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	for i := range segments {
+		segments[i] = strings.ToUpper(segments[i])
+	}
+	return segments
 }
 
 // RedactValue masks a single key/value pair.
