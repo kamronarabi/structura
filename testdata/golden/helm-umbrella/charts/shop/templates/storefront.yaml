@@ -1,0 +1,16 @@
+{{- if .Values.storefront.create }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.storefront.name }}
+spec:
+  replicas: {{ .Values.storefront.replicaCount }}
+  template:
+    spec:
+      containers:
+        - name: {{ .Values.storefront.name }}
+          image: "{{ .Values.images.repository }}/storefront:{{ .Values.images.tag }}"
+          env:
+            - name: CART_API_URL
+              value: {{ .Values.storefront.env.CART_API_URL | quote }}
+{{- end }}

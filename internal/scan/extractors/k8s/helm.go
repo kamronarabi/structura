@@ -20,6 +20,33 @@ import (
 // chart was skipped needs to know their node set is incomplete and why;
 // silently producing a sparse graph would leave them believing Structura had
 // read their deployment and found three services.
+//
+// # What rendering was measured to be worth
+//
+// The count of these diagnostics is not that number, and reading it as one is
+// a mistake worth recording. Rendering was spiked against the corpus with
+// helm.sh/helm/v3, which does build CGO-free and does render correctly:
+//
+//   - online-boutique renders 36 objects whose env vars are the same edges
+//     already extracted from its plain manifests. Marginal gain: none.
+//   - sock-shop renders 29 objects carrying 8 env pairs, one of which is
+//     already known. Its missing edges are hardcoded in application source
+//     that is not in the repository.
+//   - bitnami-charts fails on 24 of 25 charts: they depend on a common
+//     library chart from an OCI registry and do not vendor it, so rendering
+//     needs a network fetch at scan time against a floating version range.
+//     That is incompatible with a scan being offline and reproducible.
+//
+// The cost is a binary going from 15 MB to roughly 50 MB on five platforms,
+// plus a framework change, because rendering needs a whole chart directory
+// and an extractor is contractually given one file.
+//
+// The one case it would genuinely fix -- a repository whose only deployment
+// description is a chart -- turned out to be mostly a values problem rather
+// than a rendering problem: an umbrella chart names its workloads in
+// values.yaml, which is read without executing anything. See the helm
+// package. What rendering still buys beyond that is the wiring between them,
+// and that is what this diagnostic is for.
 
 func isHelmTemplate(f *scan.File) bool {
 	return classify.IsHelmTemplate(f.Path, f.Content)

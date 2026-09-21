@@ -1,0 +1,57 @@
+# Chart-wide settings. Not a component: no name, and nothing deployable.
+images:
+  repository: ghcr.io/acme
+  tag: "2.1.0"
+
+# A feature switch, not a component.
+networkPolicies:
+  create: false
+
+storefront:
+  create: true
+  name: storefront
+  replicaCount: 2
+  service:
+    port: 8080
+  resources:
+    requests:
+      cpu: 100m
+  env:
+    CART_API_URL: http://cart-api:9090
+    SESSION_REDIS_URL: redis://shop-cache:6379/0
+
+cartApi:
+  create: true
+  name: cart-api
+  replicaCount: 3
+  service:
+    port: 9090
+  resources:
+    requests:
+      cpu: 200m
+  env:
+    ORDERS_DB_URL: postgres://cart@orders-db:5432/orders
+
+cache:
+  create: true
+  name: shop-cache
+  image:
+    repository: redis
+    tag: "7.2"
+  service:
+    port: 6379
+
+# Declared by the chart but switched off by default. The component is real --
+# the chart can deploy it -- and nothing points at it, which is the honest
+# reading rather than an omission.
+tracing:
+  create: false
+  name: jaeger
+  service:
+    port: 16686
+
+# Names a volume, not a workload. Must not become a component.
+persistence:
+  name: shop-data
+  size: 8Gi
+  storageClass: standard

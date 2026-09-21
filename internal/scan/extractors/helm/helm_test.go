@@ -2,6 +2,8 @@ package helm_test
 
 import (
 	"context"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -218,5 +220,171 @@ func TestMalformedChartIsReported(t *testing.T) {
 	}
 	if !found {
 		t.Error("a malformed Chart.yaml produced no diagnostic")
+	}
+}
+
+// umbrellaValues is a chart that deploys several differently-named services
+// from one values file, which is the shape a repository takes when its chart
+// is the only deployment description it has.
+const umbrellaValues = `
+images:
+  repository: ghcr.io/acme
+  tag: "2.1.0"
+networkPolicies:
+  create: false
+storefront:
+  create: true
+  name: storefront
+  replicaCount: 2
+  service:
+    port: 8080
+  env:
+    CART_API_URL: http://cart-api:9090
+cartApi:
+  create: true
+  name: cart-api
+  service:
+    port: 9090
+cache:
+  create: true
+  name: shop-cache
+  image:
+    repository: redis
+    tag: "7.2"
+tracing:
+  create: false
+  name: jaeger
+  service:
+    port: 16686
+persistence:
+  name: shop-data
+  size: 8Gi
+  storageClass: standard
+`
+
+func namesOf(c *capture) []string {
+	out := make([]string, 0, len(c.nodes))
+	for _, n := range c.nodes {
+		out = append(out, n.Name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// An umbrella chart produced nothing at all: looksLikeChartValues tests for
+// the single-service keys, and an umbrella has none of them at the top level,
+// so a chart deploying a dozen services yielded no components.
+func TestUmbrellaChartYieldsAComponentPerWorkload(t *testing.T) {
+	c := extract(t, "charts/shop/values.yaml", umbrellaValues)
+
+	want := []string{"cart-api", "jaeger", "shop-cache", "storefront"}
+	if got := namesOf(c); !reflect.DeepEqual(got, want) {
+		t.Fatalf("components = %v, want %v", got, want)
+	}
+	for _, n := range c.nodes {
+		if n.Namespace != "shop" {
+			t.Errorf("%s is in namespace %q, want the chart directory", n.Name, n.Namespace)
+		}
+		if n.Confidence != schema.ConfWeak {
+			t.Errorf("%s has confidence %.2f; a component read from defaults is not a declared one",
+				n.Name, n.Confidence)
+		}
+	}
+}
+
+// A name alone is not enough. The blocks below name something without
+// deploying anything, and emitting "shop-data" as a component is exactly the
+// confident invention the confidence model exists to prevent.
+func TestUmbrellaRejectsBlocksThatAreNotWorkloads(t *testing.T) {
+	c := extract(t, "charts/shop/values.yaml", umbrellaValues)
+
+	for _, unwanted := range []string{"shop-data", "images", "networkPolicies", "persistence"} {
+		for _, n := range c.nodes {
+			if n.Name == unwanted {
+				t.Errorf("%q became a component; it names a volume or a setting, not a workload", unwanted)
+			}
+		}
+	}
+}
+
+// The image says what a workload is; the name only suggests it.
+func TestUmbrellaClassifiesByImage(t *testing.T) {
+	c := extract(t, "charts/shop/values.yaml", umbrellaValues)
+
+	for _, n := range c.nodes {
+		if n.Name != "shop-cache" {
+			continue
+		}
+		if n.Kind != schema.KindDatastore {
+			t.Errorf("shop-cache is %s; it runs redis, which a name-only reading would miss", n.Kind)
+		}
+		return
+	}
+	t.Fatal("no shop-cache component")
+}
+
+// A workload the chart can deploy is worth knowing about even when it is off,
+// and whether it is on is a fact about it. online-boutique's collector is
+// declared exactly this way, which is why nothing points at it.
+func TestDisabledWorkloadIsEmittedAndMarked(t *testing.T) {
+	c := extract(t, "charts/shop/values.yaml", umbrellaValues)
+
+	for _, n := range c.nodes {
+		if n.Name != "jaeger" {
+			continue
+		}
+		if enabled, ok := n.Attrs["enabled"].(bool); !ok || enabled {
+			t.Errorf("jaeger does not record that the chart disables it: attrs=%v", n.Attrs)
+		}
+		return
+	}
+	t.Fatal("a workload the chart declares but disables was dropped entirely")
+}
+
+// A reference inside a workload's block is that workload's dependency.
+// Attaching every reference to one chart-level component would make the
+// busiest service in the chart look like the only one with dependencies.
+func TestUmbrellaReferencesAttachToTheirWorkload(t *testing.T) {
+	c := extract(t, "charts/shop/values.yaml", umbrellaValues)
+
+	var storefront string
+	for _, n := range c.nodes {
+		if n.Name == "storefront" {
+			storefront = n.ID
+		}
+	}
+	if storefront == "" {
+		t.Fatal("no storefront component")
+	}
+	if len(c.hints) == 0 {
+		t.Fatal("no references found; an umbrella chart's connection strings were dropped")
+	}
+	for _, h := range c.hints {
+		if h.FromNode != storefront {
+			t.Errorf("reference %q came from %s, want the storefront that declares it", h.Raw, h.FromNode)
+		}
+	}
+}
+
+// A chart with a top-level image is one product, not an umbrella. Its primary
+// and readReplicas blocks are components of a single datastore whose names are
+// release-name suffixes, so reading them as separate services would turn one
+// database into two badly-named ones.
+func TestSingleProductChartIsNotReadAsAnUmbrella(t *testing.T) {
+	c := extract(t, "charts/postgresql/values.yaml", `
+image:
+  repository: bitnami/postgresql
+  tag: "16"
+primary:
+  name: primary
+  service:
+    port: 5432
+readReplicas:
+  name: read
+  replicaCount: 2
+`)
+
+	if got := namesOf(c); !reflect.DeepEqual(got, []string{"postgresql"}) {
+		t.Fatalf("components = %v, want just the chart itself", got)
 	}
 }

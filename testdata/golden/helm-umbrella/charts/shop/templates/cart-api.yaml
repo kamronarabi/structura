@@ -1,0 +1,13 @@
+{{- if .Values.cartApi.create }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.cartApi.name }}
+spec:
+  replicas: {{ .Values.cartApi.replicaCount }}
+  template:
+    spec:
+      containers:
+        - name: {{ .Values.cartApi.name }}
+          image: "{{ .Values.images.repository }}/cart-api:{{ .Values.images.tag }}"
+{{- end }}

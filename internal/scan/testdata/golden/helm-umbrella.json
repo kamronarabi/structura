@@ -1,0 +1,202 @@
+{
+  "schemaVersion": "0.3.0",
+  "generatedAt": "0001-01-01T00:00:00Z",
+  "contentHash": "sha256:03b43b7fc795d554ea1465027186f000e025a864285e992cce0d2eefb7b0502c",
+  "root": {
+    "name": "helm-umbrella"
+  },
+  "nodes": [
+    {
+      "id": "boundary:helm/shop/shop",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "shop",
+      "namespace": "shop",
+      "attrs": {
+        "appVersion": "2.1.0",
+        "chartVersion": "1.4.0",
+        "packaging": "helm"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/shop/Chart.yaml",
+          "line": 2
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "datastore:helm/shop/shop-cache",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "shop-cache",
+      "namespace": "shop",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "redis"
+      },
+      "attrs": {
+        "image": "redis:7.2",
+        "packaging": "helm",
+        "ports": [
+          6379
+        ],
+        "valuesKey": "cache"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/shop/values.yaml",
+          "line": 37
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "service:helm/shop/cart-api",
+      "kind": "service",
+      "layer": "container",
+      "name": "cart-api",
+      "namespace": "shop",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "packaging": "helm",
+        "ports": [
+          9090
+        ],
+        "replicas": 3,
+        "valuesKey": "cartApi"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/shop/values.yaml",
+          "line": 25
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "service:helm/shop/jaeger",
+      "kind": "service",
+      "layer": "container",
+      "name": "jaeger",
+      "namespace": "shop",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "jaeger"
+      },
+      "attrs": {
+        "enabled": false,
+        "packaging": "helm",
+        "ports": [
+          16686
+        ],
+        "valuesKey": "tracing"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/shop/values.yaml",
+          "line": 49
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "service:helm/shop/storefront",
+      "kind": "service",
+      "layer": "container",
+      "name": "storefront",
+      "namespace": "shop",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "packaging": "helm",
+        "ports": [
+          8080
+        ],
+        "replicas": 2,
+        "valuesKey": "storefront"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/shop/values.yaml",
+          "line": 12
+        }
+      ],
+      "confidence": 0.4
+    }
+  ],
+  "edges": [
+    {
+      "id": "e:6865d5e72144",
+      "from": "service:helm/shop/storefront",
+      "to": "datastore:helm/shop/shop-cache",
+      "kind": "persists_to",
+      "protocol": "redis",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "helm",
+          "path": "charts/shop/values.yaml",
+          "line": 21,
+          "rule": "name_exact",
+          "detail": "values storefront.env.SESSION_REDIS_URL=redis://shop-cache:6379/0 (resolves to shop-cache)"
+        }
+      ]
+    },
+    {
+      "id": "e:e667e343eb41",
+      "from": "service:helm/shop/storefront",
+      "to": "service:helm/shop/cart-api",
+      "kind": "calls",
+      "protocol": "http",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "helm",
+          "path": "charts/shop/values.yaml",
+          "line": 20,
+          "rule": "name_exact",
+          "detail": "values storefront.env.CART_API_URL=http://cart-api:9090 (resolves to cart-api)"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warn",
+      "code": "helm_unrendered",
+      "path": "charts/shop/templates",
+      "message": "2 Helm templates not rendered; components declared only in this chart are missing from the graph"
+    },
+    {
+      "severity": "info",
+      "code": "helm_values_inferred",
+      "path": "charts/shop/values.yaml",
+      "message": "4 components were inferred from chart default values rather than rendered templates; their names and settings may differ at install time"
+    },
+    {
+      "severity": "info",
+      "code": "unresolved_reference",
+      "path": "charts/shop/values.yaml",
+      "line": 33,
+      "message": "\"cart-api.shop\" refers to \"orders-db\", which matches no component in this repository"
+    }
+  ],
+  "stats": {
+    "filesScanned": 5,
+    "filesParsed": 4,
+    "nodeCount": 5,
+    "edgeCount": 2,
+    "connected": 3,
+    "clusters": 3,
+    "durationMs": 0
+  }
+}
