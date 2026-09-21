@@ -1,11 +1,99 @@
 {
   "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-21T03:26:54Z",
-  "contentHash": "sha256:463414e6869039d37337a1b2b07ddcc0ca47b5231a91a3347060ffe1981ed743",
+  "generatedAt": "2026-09-21T04:16:14Z",
+  "contentHash": "sha256:996fc898418348dcbea937ae245757eff8d74651fa79c997608ad423c1916714",
   "root": {
     "name": "multi-environment"
   },
   "nodes": [
+    {
+      "id": "boundary:k8s/default/default",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "default",
+      "namespace": "default",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "namespace": "default",
+        "orchestrator": "kubernetes"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "base/api.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "boundary:k8s/dev/dev",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "dev",
+      "namespace": "dev",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "namespace": "dev",
+        "orchestrator": "kubernetes"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "overlays/dev/db.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "boundary:k8s/prod/prod",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "prod",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "namespace": "prod",
+        "orchestrator": "kubernetes"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "overlays/prod/db.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "boundary:k8s/staging/staging",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "staging",
+      "namespace": "staging",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "namespace": "staging",
+        "orchestrator": "kubernetes"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "overlays/staging/db.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
     {
       "id": "datastore:k8s/dev/db",
       "kind": "datastore",
@@ -122,7 +210,72 @@
       "confidence": 1
     }
   ],
-  "edges": [],
+  "edges": [
+    {
+      "id": "e:8879a8eea343",
+      "from": "boundary:k8s/default/default",
+      "to": "service:k8s/default/api",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "base/api.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"default\""
+        }
+      ]
+    },
+    {
+      "id": "e:f9318df73af7",
+      "from": "boundary:k8s/dev/dev",
+      "to": "datastore:k8s/dev/db",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "overlays/dev/db.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"dev\""
+        }
+      ]
+    },
+    {
+      "id": "e:60f4f3763e11",
+      "from": "boundary:k8s/prod/prod",
+      "to": "datastore:k8s/prod/db",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "overlays/prod/db.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
+        }
+      ]
+    },
+    {
+      "id": "e:0d2f93c39b69",
+      "from": "boundary:k8s/staging/staging",
+      "to": "datastore:k8s/staging/db",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "overlays/staging/db.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"staging\""
+        }
+      ]
+    }
+  ],
   "diagnostics": [
     {
       "severity": "warn",
@@ -177,8 +330,10 @@
   "stats": {
     "filesScanned": 11,
     "filesParsed": 11,
-    "nodeCount": 4,
-    "edgeCount": 0,
-    "durationMs": 2
+    "nodeCount": 8,
+    "edgeCount": 4,
+    "connected": 0,
+    "clusters": 4,
+    "durationMs": 0
   }
 }

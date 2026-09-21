@@ -551,3 +551,98 @@ resource "aws_sqs_queue" "jobs" { name = "jobs" }
 		t.Errorf("node name = %q, want %q", c.nodes[0].Name, "jobs")
 	}
 }
+
+// A reference always runs from the member to its boundary -- a resource names
+// the VPC or cluster it sits in, never the other way round -- so containment
+// derived from one has to be written in the opposite direction. Emitted as
+// read, it produced edges claiming a Lambda contains a VPC.
+func TestContainmentRunsFromTheBoundary(t *testing.T) {
+	c := extract(t, "main.tf", `
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+
+resource "aws_ecs_cluster" "app" {
+  name = "app"
+}
+
+resource "aws_lambda_function" "api" {
+  function_name = "api"
+  vpc_config {
+    subnet_ids = [aws_vpc.main.id]
+  }
+}
+
+resource "aws_ecs_service" "worker" {
+  name    = "worker"
+  cluster = aws_ecs_cluster.app.id
+}
+`)
+
+	for _, tc := range []struct{ boundary, member string }{
+		{"aws_vpc.main", "aws_lambda_function.api"},
+		{"aws_ecs_cluster.app", "aws_ecs_service.worker"},
+	} {
+		e := c.edgeBetween(tc.boundary, tc.member)
+		if e == nil {
+			t.Fatalf("no edge from %s to %s; containment runs from the container", tc.boundary, tc.member)
+		}
+		if e.Kind != schema.EdgeContains {
+			t.Errorf("%s -> %s is %s, want contains", tc.boundary, tc.member, e.Kind)
+		}
+		if back := c.edgeBetween(tc.member, tc.boundary); back != nil && back.Kind == schema.EdgeContains {
+			t.Errorf("%s claims to contain %s", tc.member, tc.boundary)
+		}
+		// The reference is still what justifies the edge, so the evidence
+		// has to name it even though the edge points the other way.
+		if len(e.Evidence) == 0 || !strings.Contains(e.Evidence[0].Detail, tc.member) {
+			t.Errorf("evidence %+v does not name the reference it came from", e.Evidence)
+		}
+	}
+}
+
+// A module call groups nothing this graph can see: the resources it
+// instantiates live in another directory under their own namespace, and a
+// module reused by several callers could not sit inside all of them at once.
+// Calling it a boundary excluded it from the connected count and from
+// resolution, which is how a repository of module calls reported no
+// relationships at all.
+func TestAModuleCallIsAContainerNotABoundary(t *testing.T) {
+	c := extract(t, "main.tf", `
+module "vpc" {
+  source = "../.."
+}
+
+module "security_group" {
+  source = "terraform-aws-modules/security-group/aws"
+  vpc_id = module.vpc.vpc_id
+}
+`)
+
+	for _, name := range []string{"vpc", "security_group"} {
+		var found *schema.Node
+		for i := range c.nodes {
+			if c.nodes[i].Name == name {
+				found = &c.nodes[i]
+			}
+		}
+		if found == nil {
+			t.Fatalf("no node for module %q", name)
+		}
+		if found.Kind == schema.KindBoundary {
+			t.Errorf("module %q is a boundary, but contains nothing", name)
+		}
+		if found.Layer != schema.LayerContainer {
+			t.Errorf("module %q is at layer %s, want container", name, found.Layer)
+		}
+		if !strings.HasPrefix(found.ID, string(schema.KindCloudResource)+":") {
+			t.Errorf("module %q has id %s, which disagrees with its kind", name, found.ID)
+		}
+	}
+
+	// The reference between two module calls still has to resolve, which it
+	// can only do if collectDeclarations builds the same ID emitModule does.
+	if e := c.edgeBetween("module.security_group", "module.vpc"); e == nil {
+		t.Error("no edge from security_group to vpc; the module id changed in one place only")
+	}
+}

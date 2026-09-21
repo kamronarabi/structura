@@ -147,7 +147,7 @@ func (m *module) collectDeclarations(body *hclsyntax.Body) {
 		case "module":
 			if labels, ok := namedLabels(block, 1); ok {
 				m.declared["module."+labels[0]] =
-					m.nodeID(schema.KindBoundary, "module", labels[0])
+					m.nodeID(moduleKind, "module", labels[0])
 			}
 		}
 	}
@@ -264,6 +264,30 @@ func (m *module) emitResource(block *hclsyntax.Block, emit scan.Emitter, managed
 	m.emitReferences(block, emit, id, address, line)
 }
 
+// moduleKind is what a `module` block becomes.
+//
+// It was a boundary at the context layer, and both halves were wrong. A
+// boundary is a grouping that holds other nodes through contains edges, and a
+// module call never gets any: the resources it instantiates are declared in
+// another directory and are extracted under their own namespace, so the
+// module node groups nothing that this graph can see. Nor can it -- a module
+// reused by eight callers would have to sit inside eight containers at once,
+// and containment has to be a tree for a reader to navigate it.
+//
+// The cost was not cosmetic. Boundaries are excluded from the connected count
+// and from resolution targets, so a repository built out of module calls --
+// which is what a Terraform module library is -- reported no relationships at
+// all and could not be referred to. terraform-aws-vpc came out as 48 nodes,
+// every one of them a context-layer boundary, with 19 real dependency edges
+// between them and a cohesion of zero.
+//
+// A module call is an instantiated unit of infrastructure whose composition
+// is not visible from here, which is what cloud_resource means, and it sits
+// inside the system rather than around it, which is the container layer.
+// Whether its definition is in this repository at all is recorded in attrs,
+// where it is a fact about the node rather than a claim about its shape.
+const moduleKind = schema.KindCloudResource
+
 func (m *module) emitModule(block *hclsyntax.Block, emit scan.Emitter) {
 	labels, ok := namedLabels(block, 1)
 	if !ok {
@@ -271,7 +295,7 @@ func (m *module) emitModule(block *hclsyntax.Block, emit scan.Emitter) {
 	}
 	name := labels[0]
 	line := block.TypeRange.Start.Line
-	id := m.nodeID(schema.KindBoundary, "module", name)
+	id := m.nodeID(moduleKind, "module", name)
 
 	attrs := schema.Attrs{"terraformModule": name}
 	if source, ok := m.scope.literalAttr(block.Body, "source"); ok {
@@ -290,7 +314,7 @@ func (m *module) emitModule(block *hclsyntax.Block, emit scan.Emitter) {
 	}
 
 	emit.Node(schema.Node{
-		ID: id, Kind: schema.KindBoundary, Layer: schema.LayerContext,
+		ID: id, Kind: moduleKind, Layer: schema.LayerContainer,
 		Name: name, Namespace: m.namespace,
 		Tech:  &schema.Tech{Runtime: "terraform", Framework: "module"},
 		Attrs: attrs, Sources: []schema.Source{{Extractor: Name, Path: m.file.Path, Line: line}},
@@ -338,13 +362,27 @@ func (m *module) emitReferences(block *hclsyntax.Block, emit scan.Emitter, fromI
 		case m.declared[ref.address] != "":
 			// Both ends are in this file, so the edge is justified without
 			// looking anywhere else.
+			from, to := fromID, m.declared[ref.address]
+			kind := edgeKindFor(ref.address)
+			rule := "terraform_reference"
+			if kind == schema.EdgeContains {
+				// Containment runs from the container, and a reference
+				// always runs the other way: `vpc_id = aws_vpc.main.id` is
+				// the member naming its boundary, never the boundary
+				// enumerating its members. Written as-is it produced edges
+				// asserting that a Lambda contains a VPC and a task
+				// contains its ECS cluster -- backwards, and stated at the
+				// confidence of a declared fact.
+				from, to = to, from
+				rule = "terraform_containment"
+			}
 			emit.Edge(schema.Edge{
-				From: fromID, To: m.declared[ref.address],
-				Kind:       edgeKindFor(ref.address),
+				From: from, To: to,
+				Kind:       kind,
 				Confidence: schema.ConfReference,
 				Evidence: []schema.Evidence{{
 					Extractor: Name, Path: m.file.Path, Line: line,
-					Rule:   "terraform_reference",
+					Rule:   rule,
 					Detail: fmt.Sprintf("%s references %s", fromAddress, ref.expression),
 				}},
 			})

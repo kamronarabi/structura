@@ -1,7 +1,7 @@
 {
   "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-20T23:12:17Z",
-  "contentHash": "sha256:eb0e4d541e9ecee413a6d604f23e9adc2c6c6101ed85fc19014fd5bef9f3b716",
+  "generatedAt": "2026-09-21T04:16:14Z",
+  "contentHash": "sha256:546a5a069a11b8e5a698da67a8ca7f1b12b71729cc4557ba47dac64757313e5d",
   "root": {
     "name": "helm-chart"
   },
@@ -212,6 +212,8 @@
     "filesParsed": 5,
     "nodeCount": 5,
     "edgeCount": 4,
+    "connected": 3,
+    "clusters": 1,
     "durationMs": 0
   }
 }

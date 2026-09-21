@@ -1,7 +1,7 @@
 {
   "schemaVersion": "0.1.0",
-  "generatedAt": "2026-09-21T02:44:08Z",
-  "contentHash": "sha256:757889c2bb01f1def37e1685eb64006acc5cfba7153f2761bc245975cc5bf2f1",
+  "generatedAt": "2026-09-21T04:16:14Z",
+  "contentHash": "sha256:ea2539bfc7cf92b7679f584810fdd830272615075c3da762bbfd7eb0ecce524e",
   "root": {
     "name": "compose-monolith"
   },
@@ -421,6 +421,8 @@
     "filesParsed": 1,
     "nodeCount": 8,
     "edgeCount": 12,
-    "durationMs": 6
+    "connected": 7,
+    "clusters": 1,
+    "durationMs": 7
   }
 }

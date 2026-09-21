@@ -1,15 +1,15 @@
 {
   "schemaVersion": "0.1.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:267e13d01b08aff580c1fb1e32a1cf793013c90aa2975545dbde4aea361a7535",
+  "contentHash": "sha256:726a242bc91c50d00b921c15430df430a3c3a8104ff1e11727e4b73b9915ba41",
   "root": {
     "name": "terraform-serverless"
   },
   "nodes": [
     {
-      "id": "boundary:terraform/root/module.network",
-      "kind": "boundary",
-      "layer": "context",
+      "id": "cloud_resource:terraform/root/module.network",
+      "kind": "cloud_resource",
+      "layer": "container",
       "name": "network",
       "namespace": "root",
       "tech": {
