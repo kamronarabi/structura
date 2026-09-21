@@ -27,21 +27,6 @@ edges:
   - {from: cartservice, to: redis-cart}
   - {from: loadgenerator, to: frontend}
 
-  # Every instrumented service exports traces to the collector. Added after
-  # the source oracle found them: this file had omitted all seven, which made
-  # the recall score measure what Structura can see rather than what is there.
-  # They are declared in helm-chart/templates/*.yaml behind
-  # {{- if .Values.opentelemetryCollector.create }}, so finding them needs
-  # Helm rendering -- which is a real gap, reported as helm_unrendered, and
-  # belongs in recall rather than hidden by leaving the edges out.
-  - {from: frontend, to: opentelemetrycollector}
-  - {from: checkoutservice, to: opentelemetrycollector}
-  - {from: currencyservice, to: opentelemetrycollector}
-  - {from: emailservice, to: opentelemetrycollector}
-  - {from: paymentservice, to: opentelemetrycollector}
-  - {from: productcatalogservice, to: opentelemetrycollector}
-  - {from: recommendationservice, to: opentelemetrycollector}
-
 allowed:
   # Ingress routing, correct but a deployment detail rather than app design.
   - {from: frontend-ingress, to: frontend}
@@ -54,6 +39,27 @@ allowed:
   # this deployment. Listed so the oracle's finding is accounted for rather
   # than silently dropped.
   - {from: frontend, to: packagingservice}
+
+  # Tracing. Every instrumented service reads COLLECTOR_SERVICE_ADDR, which is
+  # what the source oracle found, and these sat under `edges` for a while on
+  # the strength of that -- taking recall to 0.71 and blaming unrendered Helm.
+  # Rendering the chart does not produce them: helm-chart/values.yaml sets
+  # opentelemetryCollector.create to false, kubernetes-manifests/frontend.yaml
+  # has the variables commented out, and the collector node exists at all only
+  # because the scan reads kustomize/components/google-cloud-operations/,
+  # an opt-in component no base includes.
+  #
+  # So the application can talk to a collector and no deployment described
+  # here wires one up. That is a capability, not a dependency, and charging
+  # recall for it would have measured the resolver against a configuration the
+  # repository does not ship.
+  - {from: frontend, to: opentelemetrycollector}
+  - {from: checkoutservice, to: opentelemetrycollector}
+  - {from: currencyservice, to: opentelemetrycollector}
+  - {from: emailservice, to: opentelemetrycollector}
+  - {from: paymentservice, to: opentelemetrycollector}
+  - {from: productcatalogservice, to: opentelemetrycollector}
+  - {from: recommendationservice, to: opentelemetrycollector}
 
 # The oracle derives these same relationships from the application source, so
 # that this file is checked rather than trusted. See oracle_test.go.
