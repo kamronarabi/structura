@@ -3,10 +3,12 @@ package mcpserver_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -578,5 +580,92 @@ func TestDescribeNodeSurfacesDiagnosticsForItsFiles(t *testing.T) {
 	}
 	if !sawAttribution {
 		t.Error("no component surfaced a diagnostic for its own files, though the scan reported some")
+	}
+}
+
+// Diagnostics are sorted by path, so a truncated list is arbitrary with
+// respect to the kind of problem it reports -- and the distribution is
+// steeply skewed, so the budget goes on many copies of one code while whole
+// classes of problem never appear. The breakdown is written as headers, so it
+// survives truncation and tells the model both the full shape of the gaps and
+// what to pass to code=.
+func TestDiagnosticsLeadWithTheShapeOfTheGaps(t *testing.T) {
+	s, ctx := connect(t, fixture(t, "multi-environment"))
+
+	out, isErr := callText(t, s, ctx, "structura_diagnostics", map[string]any{})
+	if isErr {
+		t.Fatalf("diagnostics failed: %s", out)
+	}
+
+	// Every code present in the detail has to appear in the breakdown above
+	// it, which is the property that makes the breakdown worth its tokens.
+	head, _, ok := strings.Cut(out, "Pass code=")
+	if !ok {
+		t.Fatalf("no breakdown; a model cannot tell what to filter on:\n%s", out)
+	}
+	for _, code := range []string{"kustomize_unrendered", "k8s_patch_fragment"} {
+		if !strings.Contains(head, code) {
+			t.Errorf("breakdown omits %s:\n%s", head, code)
+		}
+	}
+	if !strings.Contains(head, "4  kustomize_unrendered") {
+		t.Errorf("breakdown does not carry counts:\n%s", head)
+	}
+
+	// Filtering by a code from the breakdown has to actually work.
+	filtered, isErr := callText(t, s, ctx, "structura_diagnostics",
+		map[string]any{"code": "kustomize_unrendered"})
+	if isErr {
+		t.Fatalf("filtering by a code from the breakdown failed: %s", filtered)
+	}
+	if strings.Contains(filtered, "k8s_patch_fragment") {
+		t.Errorf("code= did not filter:\n%s", filtered)
+	}
+	// One code left: the breakdown would restate the list it compresses.
+	if strings.Contains(filtered, "Pass code=") {
+		t.Errorf("a single-code list still prints a breakdown:\n%s", filtered)
+	}
+}
+
+// The header states the real total and the truncation notice states how much
+// of it was shown. When they disagree the model believes the smaller number,
+// because that is the one carrying the instruction to fetch more.
+//
+// The golden fixtures are all far too small to truncate, so this builds a
+// repository big enough to overrun the budget rather than asserting a
+// property nothing exercises.
+func TestTruncationNoticeAgreesWithTheHeader(t *testing.T) {
+	const services = 120
+
+	root := t.TempDir()
+	var b strings.Builder
+	b.WriteString("services:\n")
+	for i := 0; i < services; i++ {
+		fmt.Fprintf(&b, "  service-%03d:\n    image: example/service-%03d:1.0\n", i, i)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docker-compose.yml"), []byte(b.String()), 0o600); err != nil {
+		t.Fatalf("writing the compose file: %v", err)
+	}
+
+	s, ctx := connect(t, root)
+	out, isErr := callText(t, s, ctx, "structura_list_nodes", map[string]any{})
+	if isErr {
+		t.Fatalf("list_nodes failed: %s", out)
+	}
+
+	stated := regexp.MustCompile(`(?m)^(\d+) components? match`).FindStringSubmatch(out)
+	if stated == nil {
+		t.Fatalf("list_nodes has no count header:\n%s", out)
+	}
+	notice := regexp.MustCompile(`truncated: (\d+) of (\d+)`).FindStringSubmatch(out)
+	if notice == nil {
+		t.Fatalf("%d services did not overrun the budget, so this proves nothing:\n%s", services, out)
+	}
+
+	if notice[2] != stated[1] {
+		t.Errorf("header says %s components, truncation notice says %s", stated[1], notice[2])
+	}
+	if notice[1] == notice[2] {
+		t.Errorf("notice claims everything was shown while announcing truncation: %s", notice[0])
 	}
 }

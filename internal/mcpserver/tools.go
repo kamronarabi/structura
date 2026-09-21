@@ -22,6 +22,11 @@ const (
 	budgetDiagnostics = 1000
 )
 
+// mostConnected bounds the overview's busiest-components list. The overview
+// is meant to orient, not to enumerate; list_nodes is where the full set
+// lives.
+const mostConnected = 8
+
 func textResult(s string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: s}}}
 }
@@ -115,8 +120,9 @@ func (s *Server) overview(ctx context.Context, _ *mcp.CallToolRequest, _ Overvie
 	if len(byDegree) > 0 {
 		r.Headerf("")
 		r.Headerf("Most connected:")
+		r.Expect(min(len(byDegree), mostConnected))
 		for i, item := range byDegree {
-			if i >= 8 {
+			if i >= mostConnected {
 				break
 			}
 			if !r.Itemf("  %-28s %d out, %d in", v.label(item.id), item.out, item.in) {
@@ -183,6 +189,7 @@ func (s *Server) listNodes(ctx context.Context, _ *mcp.CallToolRequest, args Lis
 		start = 0
 	}
 	r.Countf(start)
+	r.Expect(len(matched))
 
 	for _, n := range matched[start:] {
 		out, in := v.degree(n.ID)
@@ -282,6 +289,7 @@ func (s *Server) describeNode(ctx context.Context, _ *mcp.CallToolRequest, args 
 		} else {
 			r.Headerf("Reported for this component's files, so the picture above may be incomplete:")
 		}
+		r.Expect(len(related))
 		for _, d := range related {
 			if !r.Itemf("  [%s] %s at %s\n      %s",
 				d.Severity, d.Code, location(d.Path, d.Line), d.Message) {
@@ -320,6 +328,7 @@ func writeEdges(r *Response, v *view, heading string, edges []schema.Edge, other
 
 	r.Headerf("")
 	r.Headerf("%s:", heading)
+	r.Expect(len(relevant))
 	for _, e := range relevant {
 		line := fmt.Sprintf("  %s %s (%.2f)", e.Kind, v.label(other(e)), e.Confidence)
 		if e.Protocol != "" {
@@ -473,13 +482,20 @@ func (s *Server) diagnostics(ctx context.Context, _ *mcp.CallToolRequest, args D
 	}
 	r.Headerf("%d %s. Each one is a part of the architecture that may be missing from the graph.",
 		len(matched), plural(len(matched), "gap", "gaps"))
-	r.Headerf("")
 
 	start := args.Cursor
 	if start < 0 || start >= len(matched) {
 		start = 0
 	}
+	// Only on the first page. A continuation is a second call in the same
+	// conversation, so the model still has the breakdown in front of it and
+	// repeating it would spend budget that belongs to the entries.
+	if start == 0 {
+		writeCodeBreakdown(r, matched)
+	}
+	r.Headerf("")
 	r.Countf(start)
+	r.Expect(len(matched))
 
 	for _, d := range matched[start:] {
 		line := fmt.Sprintf("  [%s] %s", d.Severity, d.Code)
@@ -492,6 +508,68 @@ func (s *Server) diagnostics(ctx context.Context, _ *mcp.CallToolRequest, args D
 		}
 	}
 	return textResult(r.StringWithCursor(fmt.Sprintf("%d", start+r.Shown()), "diagnostics")), nil, nil
+}
+
+// maxBreakdownCodes bounds the breakdown, which is written as headers and so
+// is never truncated. A repository that somehow produced every diagnostic
+// this project can emit must not be able to spend the whole budget on the
+// summary of them.
+const maxBreakdownCodes = 12
+
+// writeCodeBreakdown lists how many diagnostics each code accounts for.
+//
+// Diagnostics are sorted by path, so a truncated list is arbitrary with
+// respect to the kind of problem it reports -- and the distribution is
+// steeply skewed, which makes that worse than it sounds. On online-boutique
+// the budget goes on twenty-one near-identical kustomize_unrendered entries
+// and runs out before the model ever learns that a Helm chart went
+// unrendered too, that a patch fragment was skipped, or that a Terraform
+// resource type was unrecognized: 17 of 38 shown, and the 21 missing span
+// three problem classes it never hears about.
+//
+// A model asking what is missing from the graph needs the shape of what is
+// missing more than it needs a twenty-first instance of one entry. The
+// breakdown costs a few tokens, is complete even when the detail below it is
+// not, and is also the only way to learn what to pass to code=.
+func writeCodeBreakdown(r *Response, matched []schema.Diagnostic) {
+	counts := map[string]int{}
+	for _, d := range matched {
+		counts[d.Code]++
+	}
+	// Nothing to summarize when every entry is its own kind: the breakdown
+	// would restate the list it is meant to compress.
+	if len(counts) < 2 || len(matched) <= len(counts) {
+		return
+	}
+
+	codes := make([]string, 0, len(counts))
+	for c := range counts {
+		codes = append(codes, c)
+	}
+	sort.Slice(codes, func(i, j int) bool {
+		if counts[codes[i]] != counts[codes[j]] {
+			return counts[codes[i]] > counts[codes[j]]
+		}
+		return codes[i] < codes[j]
+	})
+
+	r.Headerf("")
+	shown := codes
+	if len(shown) > maxBreakdownCodes {
+		shown = shown[:maxBreakdownCodes]
+	}
+	for _, c := range shown {
+		r.Headerf("  %4d  %s", counts[c], c)
+	}
+	if rest := len(codes) - len(shown); rest > 0 {
+		var n int
+		for _, c := range codes[len(shown):] {
+			n += counts[c]
+		}
+		r.Headerf("  %4d  across %d other %s", n, rest, plural(rest, "code", "codes"))
+	}
+	r.Headerf("")
+	r.Headerf("Pass code=<name> for every entry of one kind.")
 }
 
 // shapeNote warns when a graph is an inventory rather than a system.
