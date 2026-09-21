@@ -101,6 +101,11 @@ type Hint struct {
 	Port     int
 	Protocol string
 
+	// Vendor marks a library hint whose technology names one company rather
+	// than a kind of thing, which is what lets it draw a component instead of
+	// only corroborating one. See classify.Library.Vendor.
+	Vendor bool
+
 	// SuggestedEdge is what the relationship would be if this resolves. The
 	// extractor knows the semantics of the field it read better than the
 	// resolver does — DATABASE_URL implies persists_to regardless of what

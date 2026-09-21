@@ -1,7 +1,7 @@
 {
   "schemaVersion": "0.3.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:69cce9631297f9a4f71457bec3d6144234c648d3267ace321d14bdc8320f59b2",
+  "contentHash": "sha256:3b63f8903364e7ca18b5920895fc9953dea62bfcd0691357532dd7859ed20120",
   "root": {
     "name": "polyglot-monorepo"
   },
@@ -66,6 +66,42 @@
         }
       ],
       "confidence": 1
+    },
+    {
+      "id": "external:resolver/vendor/sentry",
+      "kind": "external",
+      "layer": "context",
+      "name": "sentry",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "sentry"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "web/package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "external:resolver/vendor/stripe",
+      "kind": "external",
+      "layer": "context",
+      "name": "stripe",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "stripe"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "services/gateway/go.mod",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
     },
     {
       "id": "queue:compose/shop/broker",
@@ -375,6 +411,23 @@
       ]
     },
     {
+      "id": "e:27b07a3e7e81",
+      "from": "service:compose/shop/gateway",
+      "to": "external:resolver/vendor/stripe",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.4,
+      "evidence": [
+        {
+          "extractor": "manifest",
+          "path": "services/gateway/go.mod",
+          "line": 1,
+          "rule": "dependency_names_vendor",
+          "detail": "go.mod depends on \"github.com/stripe/stripe-go/v79\", which indicates stripe (resolves to stripe)"
+        }
+      ]
+    },
+    {
       "id": "e:43025a974a7d",
       "from": "service:compose/shop/gateway",
       "to": "service:compose/shop/checkout",
@@ -397,15 +450,32 @@
           "detail": "env CHECKOUT_URL=http://checkout:9090 (resolves to checkout)"
         }
       ]
+    },
+    {
+      "id": "e:0ac5ffa365af",
+      "from": "service:manifest/typescript/web",
+      "to": "external:resolver/vendor/sentry",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.4,
+      "evidence": [
+        {
+          "extractor": "manifest",
+          "path": "web/package.json",
+          "line": 1,
+          "rule": "dependency_names_vendor",
+          "detail": "package.json depends on \"@sentry/node\", which indicates sentry (resolves to sentry)"
+        }
+      ]
     }
   ],
   "diagnostics": [],
   "stats": {
     "filesScanned": 5,
     "filesParsed": 5,
-    "nodeCount": 8,
-    "edgeCount": 9,
-    "connected": 5,
+    "nodeCount": 10,
+    "edgeCount": 11,
+    "connected": 8,
     "clusters": 3,
     "durationMs": 0
   }

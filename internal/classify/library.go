@@ -1,6 +1,7 @@
 package classify
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/kamronarabi/structura/pkg/schema"
@@ -27,6 +28,55 @@ type Library struct {
 	Kind schema.NodeKind
 	// Edge is the relationship the dependency implies.
 	Edge schema.EdgeKind
+}
+
+// Vendor reports whether the technology names one company rather than a kind
+// of thing.
+//
+// The distinction decides whether a dependency can put a component on the
+// diagram by itself. A Postgres driver says this service talks to a Postgres
+// and never which one, so it can only corroborate an instance something else
+// found -- inventing "a Postgres" would be a box standing for nothing. The
+// Supabase client says it talks to Supabase, and there is exactly one
+// Supabase: the same standing as the api.stripe.com the resolver already
+// synthesizes from a URL, and enough to draw.
+//
+// Which project, tenant, or region remains unknown, so what it draws is the
+// weakest edge that still asserts something.
+func (l Library) Vendor() bool { return vendorTech[l.Tech] }
+
+// vendorTech is the set of technologies that are a company. It is keyed by
+// technology rather than by package so that every client for one service --
+// the JavaScript SDK, the Python SDK, the Go module -- agrees without the
+// fact being repeated.
+var vendorTech = map[string]bool{
+	// Payments, messaging, and error reporting.
+	"stripe": true, "twilio": true, "sendgrid": true, "sentry": true,
+	"resend": true, "postmark": true, "mailgun": true,
+	"slack": true, "pusher": true, "ably": true,
+
+	// Managed data platforms. Self-hostable products are deliberately absent:
+	// Meilisearch, Typesense, Qdrant, Weaviate and Chroma name software that
+	// may be running in the cluster next door, so they stay a technology that
+	// an instance can corroborate rather than a company to draw.
+	"supabase": true, "firebase": true, "neon": true, "planetscale": true,
+	"vercel-postgres": true, "vercel-kv": true, "vercel-blob": true,
+	"upstash": true, "turso": true, "xata": true, "fauna": true, "convex": true,
+
+	// Identity.
+	"clerk": true, "auth0": true, "workos": true, "okta": true, "descope": true,
+
+	// Analytics and observability.
+	"algolia": true, "posthog": true, "segment": true, "mixpanel": true,
+	"amplitude": true, "launchdarkly": true, "datadog": true, "newrelic": true,
+	"honeycomb": true, "betterstack": true,
+
+	// Model providers and managed vector stores.
+	"openai": true, "anthropic": true, "google-ai": true, "cohere": true,
+	"replicate": true, "mistral": true, "pinecone": true,
+
+	// Cloud providers already name a company; the SDK says which one.
+	"aws": true, "gcp": true, "azure": true,
 }
 
 // libraries maps a dependency name to the infrastructure it implies. Keys are
@@ -106,8 +156,100 @@ var libraries = map[string]Library{
 	"stripe":                      {"stripe", schema.KindExternal, schema.EdgeCalls},
 	"twilio":                      {"twilio", schema.KindExternal, schema.EdgeCalls},
 	"sendgrid":                    {"sendgrid", schema.KindExternal, schema.EdgeCalls},
-	"@sentry/node":                {"sentry", schema.KindExternal, schema.EdgeCalls},
+	"@sendgrid/":                  {"sendgrid", schema.KindExternal, schema.EdgeCalls},
+	"@sentry/":                    {"sentry", schema.KindExternal, schema.EdgeCalls},
 	"sentry-sdk":                  {"sentry", schema.KindExternal, schema.EdgeCalls},
+
+	// Managed backends. An application deployed to a managed platform keeps
+	// most of its architecture here rather than in any manifest: there is no
+	// container to inspect and no connection string to read, only a
+	// dependency and a dashboard. Without these the scan sees a React app
+	// and nothing it talks to.
+	//
+	// A scope prefix covers a vendor's whole family -- @supabase/supabase-js
+	// and @supabase/auth-helpers-nextjs are one service -- so a new package
+	// from a known vendor needs no entry.
+	"@supabase/": {"supabase", schema.KindExternal, schema.EdgeCalls},
+	"supabase":   {"supabase", schema.KindExternal, schema.EdgeCalls},
+	"github.com/supabase-community/supabase-go": {"supabase", schema.KindExternal, schema.EdgeCalls},
+	"firebase":               {"firebase", schema.KindExternal, schema.EdgeCalls},
+	"firebase-admin":         {"firebase", schema.KindExternal, schema.EdgeCalls},
+	"@firebase/":             {"firebase", schema.KindExternal, schema.EdgeCalls},
+	"firebase.google.com/go": {"firebase", schema.KindExternal, schema.EdgeCalls},
+	"@neondatabase/":         {"neon", schema.KindExternal, schema.EdgePersistsTo},
+	"@planetscale/":          {"planetscale", schema.KindExternal, schema.EdgePersistsTo},
+	"@vercel/postgres":       {"vercel-postgres", schema.KindExternal, schema.EdgePersistsTo},
+	"@vercel/kv":             {"vercel-kv", schema.KindExternal, schema.EdgePersistsTo},
+	"@vercel/blob":           {"vercel-blob", schema.KindExternal, schema.EdgePersistsTo},
+	"@upstash/":              {"upstash", schema.KindExternal, schema.EdgePersistsTo},
+	"@libsql/":               {"turso", schema.KindExternal, schema.EdgePersistsTo},
+	"@xata.io/client":        {"xata", schema.KindExternal, schema.EdgePersistsTo},
+	"faunadb":                {"fauna", schema.KindExternal, schema.EdgePersistsTo},
+	"@convex-dev/":           {"convex", schema.KindExternal, schema.EdgePersistsTo},
+	"convex":                 {"convex", schema.KindExternal, schema.EdgePersistsTo},
+
+	// Identity. A sign-in provider is on the request path of nearly every
+	// page, and none of it appears in infrastructure configuration.
+	"@clerk/":                       {"clerk", schema.KindExternal, schema.EdgeCalls},
+	"clerk-backend-api":             {"clerk", schema.KindExternal, schema.EdgeCalls},
+	"github.com/clerk/clerk-sdk-go": {"clerk", schema.KindExternal, schema.EdgeCalls},
+	"@auth0/":                       {"auth0", schema.KindExternal, schema.EdgeCalls},
+	"auth0":                         {"auth0", schema.KindExternal, schema.EdgeCalls},
+	"@workos-inc/":                  {"workos", schema.KindExternal, schema.EdgeCalls},
+	"@okta/":                        {"okta", schema.KindExternal, schema.EdgeCalls},
+	"@descope/":                     {"descope", schema.KindExternal, schema.EdgeCalls},
+
+	// Email and messaging.
+	"resend":     {"resend", schema.KindExternal, schema.EdgeCalls},
+	"postmark":   {"postmark", schema.KindExternal, schema.EdgeCalls},
+	"mailgun.js": {"mailgun", schema.KindExternal, schema.EdgeCalls},
+	"@slack/":    {"slack", schema.KindExternal, schema.EdgeCalls},
+	"slack-sdk":  {"slack", schema.KindExternal, schema.EdgeCalls},
+	"@pusher/":   {"pusher", schema.KindExternal, schema.EdgeCalls},
+	"pusher":     {"pusher", schema.KindExternal, schema.EdgeCalls},
+	"ably":       {"ably", schema.KindExternal, schema.EdgeCalls},
+
+	// Search, analytics, and product telemetry.
+	"algoliasearch":                {"algolia", schema.KindExternal, schema.EdgeCalls},
+	"@algolia/":                    {"algolia", schema.KindExternal, schema.EdgeCalls},
+	"typesense":                    {"typesense", schema.KindDatastore, schema.EdgePersistsTo},
+	"meilisearch":                  {"meilisearch", schema.KindDatastore, schema.EdgePersistsTo},
+	"posthog-js":                   {"posthog", schema.KindExternal, schema.EdgeCalls},
+	"posthog-node":                 {"posthog", schema.KindExternal, schema.EdgeCalls},
+	"posthog":                      {"posthog", schema.KindExternal, schema.EdgeCalls},
+	"@segment/":                    {"segment", schema.KindExternal, schema.EdgeCalls},
+	"analytics-node":               {"segment", schema.KindExternal, schema.EdgeCalls},
+	"mixpanel":                     {"mixpanel", schema.KindExternal, schema.EdgeCalls},
+	"@amplitude/":                  {"amplitude", schema.KindExternal, schema.EdgeCalls},
+	"launchdarkly-node-server-sdk": {"launchdarkly", schema.KindExternal, schema.EdgeCalls},
+	"@launchdarkly/":               {"launchdarkly", schema.KindExternal, schema.EdgeCalls},
+
+	// Observability.
+	"dd-trace":           {"datadog", schema.KindExternal, schema.EdgeCalls},
+	"datadog-api-client": {"datadog", schema.KindExternal, schema.EdgeCalls},
+	"ddtrace":            {"datadog", schema.KindExternal, schema.EdgeCalls},
+	"newrelic":           {"newrelic", schema.KindExternal, schema.EdgeCalls},
+	"@honeycombio/":      {"honeycomb", schema.KindExternal, schema.EdgeCalls},
+	"@logtail/":          {"betterstack", schema.KindExternal, schema.EdgeCalls},
+
+	// Model providers and vector stores. A service that calls a model has a
+	// dependency on somebody else's capacity, latency, and pricing, which is
+	// architecture by any definition that matters during an incident.
+	"openai":                {"openai", schema.KindExternal, schema.EdgeCalls},
+	"@anthropic-ai/":        {"anthropic", schema.KindExternal, schema.EdgeCalls},
+	"anthropic":             {"anthropic", schema.KindExternal, schema.EdgeCalls},
+	"@google/generative-ai": {"google-ai", schema.KindExternal, schema.EdgeCalls},
+	"google-generativeai":   {"google-ai", schema.KindExternal, schema.EdgeCalls},
+	"cohere-ai":             {"cohere", schema.KindExternal, schema.EdgeCalls},
+	"replicate":             {"replicate", schema.KindExternal, schema.EdgeCalls},
+	"@mistralai/":           {"mistral", schema.KindExternal, schema.EdgeCalls},
+	"@pinecone-database/":   {"pinecone", schema.KindExternal, schema.EdgePersistsTo},
+	"pinecone-client":       {"pinecone", schema.KindExternal, schema.EdgePersistsTo},
+	"weaviate-ts-client":    {"weaviate", schema.KindDatastore, schema.EdgePersistsTo},
+	"weaviate-client":       {"weaviate", schema.KindDatastore, schema.EdgePersistsTo},
+	"chromadb":              {"chroma", schema.KindDatastore, schema.EdgePersistsTo},
+	"@qdrant/":              {"qdrant", schema.KindDatastore, schema.EdgePersistsTo},
+	"qdrant-client":         {"qdrant", schema.KindDatastore, schema.EdgePersistsTo},
 }
 
 // frameworks maps a dependency to the web framework it indicates. This does
@@ -159,6 +301,18 @@ func LibraryImplies(dependency string) (lib Library, ok bool) {
 		}
 	}
 	return best, bestLen > 0
+}
+
+// VendorTechnologies lists the technologies that name a company, sorted. It
+// exists so a test can check the set against the table rather than trusting
+// that the two were kept in step.
+func VendorTechnologies() []string {
+	out := make([]string, 0, len(vendorTech))
+	for tech := range vendorTech {
+		out = append(out, tech)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // FrameworkOf reports the web framework a dependency indicates.

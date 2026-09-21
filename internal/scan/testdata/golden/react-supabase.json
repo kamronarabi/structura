@@ -1,7 +1,7 @@
 {
   "schemaVersion": "0.3.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:056cfa057626a0c58cdc9eb8a1d341ae99adf05935927f828ae58df4cad59ff6",
+  "contentHash": "sha256:1e9814fed52fe576b50e7b032c715e6678e4e1bba304f2138e2b3cc332c0c955",
   "root": {
     "name": "react-supabase"
   },
@@ -115,6 +115,24 @@
       "confidence": 0.8
     },
     {
+      "id": "external:resolver/vendor/stripe",
+      "kind": "external",
+      "layer": "context",
+      "name": "stripe",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "stripe"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "web/package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
       "id": "service:manifest/javascript/web",
       "kind": "service",
       "layer": "container",
@@ -130,6 +148,7 @@
         "manifest": "package.json",
         "package": "storefront-web",
         "usesTechnology": [
+          "supabase",
           "stripe"
         ]
       },
@@ -203,6 +222,13 @@
           "line": 2,
           "rule": "external_host",
           "detail": "env NEXT_PUBLIC_SUPABASE_URL=https://kbqjfnwtsdplmvxr.supabase.co (resolves to kbqjfnwtsdplmvxr.supabase.co)"
+        },
+        {
+          "extractor": "manifest",
+          "path": "web/package.json",
+          "line": 1,
+          "rule": "library_corroborates",
+          "detail": "package.json depends on \"@supabase/supabase-js\", which indicates supabase"
         }
       ]
     },
@@ -220,6 +246,23 @@
           "line": 8,
           "rule": "external_host",
           "detail": "env SENTRY_DSN=https://abc123@o450001.ingest.sentry.io/4505 (resolves to o450001.ingest.sentry.io)"
+        }
+      ]
+    },
+    {
+      "id": "e:4cb8dfa94823",
+      "from": "service:manifest/javascript/web",
+      "to": "external:resolver/vendor/stripe",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.4,
+      "evidence": [
+        {
+          "extractor": "manifest",
+          "path": "web/package.json",
+          "line": 1,
+          "rule": "dependency_names_vendor",
+          "detail": "package.json depends on \"stripe\", which indicates stripe (resolves to stripe)"
         }
       ]
     },
@@ -286,9 +329,9 @@
   "stats": {
     "filesScanned": 5,
     "filesParsed": 5,
-    "nodeCount": 8,
-    "edgeCount": 6,
-    "connected": 8,
+    "nodeCount": 9,
+    "edgeCount": 7,
+    "connected": 9,
     "clusters": 2,
     "durationMs": 0
   }

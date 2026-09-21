@@ -180,6 +180,7 @@ func (e *Extractor) emit(f *scan.File, emit scan.Emitter, comp *component) {
 			FromNode: id,
 			Kind:     resolve.HintLibrary,
 			Raw:      imp.dependency,
+			Vendor:   imp.lib.Vendor(),
 			// The technology name, not a hostname: this says what kind of
 			// thing is on the other end, never which instance.
 			Tokens:        []string{imp.lib.Tech},

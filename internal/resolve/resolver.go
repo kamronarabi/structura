@@ -705,23 +705,110 @@ func (r *resolver) matchLibrary(h Hint) {
 	existing, _ := from.Attrs["usesTechnology"].([]string)
 	from.Attrs["usesTechnology"] = dedupe(append(existing, tech))
 
-	candidates := withoutSelf(r.index, r.index.byTech[tech], h.FromNode)
-	if len(candidates) != 1 {
+	if candidates := withoutSelf(r.index, r.index.byTech[tech], h.FromNode); len(candidates) == 1 {
+		target := candidates[0]
+		// Corroborate. If nothing already connects these two, a technology
+		// name is not enough to say they are connected.
+		for i := range r.edges {
+			if r.edges[i].From != h.FromNode || r.edges[i].To != target {
+				continue
+			}
+			evidence := h.Source
+			evidence.Rule = "library_corroborates"
+			r.edges[i].Evidence = append(r.edges[i].Evidence, evidence)
+			return
+		}
+	}
+
+	// A technology that is one company can be drawn on its own. Which
+	// project, tenant or region is unknown, and that is the same thing the
+	// resolver already accepts when it synthesizes api.stripe.com from a URL:
+	// the company is the component, and the account is a detail no
+	// configuration file states either.
+	if !h.Vendor {
 		return
 	}
-	target := candidates[0]
+	if reached := r.reachesVendor(h.FromNode, tech); reached != "" {
+		// Configuration named the endpoint, which is strictly better than the
+		// dependency knowing the vendor. Corroborate it and draw nothing.
+		for i := range r.edges {
+			if r.edges[i].From != h.FromNode || r.edges[i].To != reached {
+				continue
+			}
+			evidence := h.Source
+			evidence.Rule = "library_corroborates"
+			r.edges[i].Evidence = append(r.edges[i].Evidence, evidence)
+			return
+		}
+		return
+	}
 
-	// Corroborate only. If nothing already connects these two, the library
-	// is not enough to say they are connected.
-	for i := range r.edges {
-		if r.edges[i].From != h.FromNode || r.edges[i].To != target {
+	vendor := h.Vendor
+	h.Vendor = false
+	// The protocol field holds the technology name for a library hint, which
+	// would render as "over supabase". These are all HTTPS APIs.
+	h.Protocol = "https"
+	id := r.ensureVendor(tech, h.Source)
+	r.addEdge(h, Match{
+		NodeID:     id,
+		Rule:       "dependency_names_vendor",
+		Confidence: h.Kind.BaseConfidence(),
+	})
+	h.Vendor = vendor
+}
+
+// reachesVendor returns the node this component already reaches that stands
+// for a vendor, or "" if there is none.
+//
+// A managed service's hostname contains its name -- *.supabase.co,
+// *.upstash.io, *.auth0.com -- so an endpoint read out of a .env file or a pod
+// spec is recognizable as the same system the dependency names. Finding one
+// means the graph already has the better answer, with the account in it.
+func (r *resolver) reachesVendor(from, tech string) string {
+	for _, e := range r.edges {
+		if e.From != from {
 			continue
 		}
-		evidence := h.Source
-		evidence.Rule = "library_corroborates"
-		r.edges[i].Evidence = append(r.edges[i].Evidence, evidence)
-		return
+		target := r.byID[e.To]
+		if target == nil {
+			continue
+		}
+		if strings.Contains(strings.ToLower(target.Name), tech) {
+			return e.To
+		}
 	}
+	return ""
+}
+
+// ensureVendor returns the node for a third-party company, creating it once.
+//
+// It is deliberately not ensureExternal. That function takes a hostname and
+// records one, because something named an endpoint. Here nothing did: a
+// dependency names the company and stays silent about where it is reached.
+// Giving the node a plausible-looking hostname would be inventing the one
+// fact the evidence does not support.
+func (r *resolver) ensureVendor(tech string, source schema.Evidence) string {
+	id := schema.NewNodeID(schema.KindExternal, "resolver", "vendor", tech)
+	if _, exists := r.byID[id]; exists {
+		return id
+	}
+
+	node := schema.Node{
+		ID:        id,
+		Kind:      schema.KindExternal,
+		Layer:     schema.LayerContext,
+		Name:      tech,
+		Namespace: "vendor",
+		Attrs:     schema.Attrs{"vendor": tech},
+		Sources:   []schema.Source{{Extractor: source.Extractor, Path: source.Path, Line: source.Line}},
+		// The dependency is in the manifest beyond doubt. What is inferred is
+		// that the service reaches this company over the network at all.
+		Confidence: schema.ConfWeak,
+	}
+	r.nodes = append(r.nodes, node)
+	r.byID = rebuildByID(r.nodes)
+	r.index.add(identityOf(node))
+	return id
 }
 
 func (r *resolver) addEdge(h Hint, m Match) {

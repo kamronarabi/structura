@@ -13,6 +13,7 @@ projects:
   - testdata/golden/compose-monolith
   - testdata/golden/helm-chart
   - testdata/golden/k8s-microservices
+  - testdata/golden/managed-backends
   - testdata/golden/multi-environment
   - testdata/golden/polyglot-monorepo
   - testdata/golden/react-supabase
