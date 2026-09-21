@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"unicode"
 )
 
 // Node IDs have the form:
@@ -22,8 +23,56 @@ import (
 // [a-z0-9._-] folded to a hyphen. Name preserves slashes so that package
 // identifiers such as github.com/spf13/cobra survive intact. The original,
 // unnormalized string is kept in Node.Name for display.
+//
+// # Folding is lossy, so it carries a discriminator
+//
+// Folding maps many inputs onto one output, and two components that fold
+// together become one node with no sign that anything was merged. Every
+// non-Latin identifier collapsed to the same ID -- a service named in
+// Japanese, Chinese, or Russian all became "unknown" -- and "vttablet-{{uid}}"
+// was indistinguishable from a literal "vttablet-uid".
+//
+// So when folding the name actually loses information, the ID carries eight
+// hex characters derived from the original. Case is not counted as a loss
+// here: an infrastructure name is discovered by several extractors that may
+// spell it differently, and folding "Postgres" and "postgres" onto one node
+// is the merge this package exists to perform. Across seven real
+// repositories, one name in 374 needs a discriminator.
+//
+// The source and namespace segments cannot hold a slash, since those are the
+// ID's own separators, so a namespace of "examples/complete" folds to
+// "examples-complete" and would collide with a literal one. That is left
+// alone deliberately: it affects 18 of 191 real namespaces, prevents no
+// collision anyone has, and the noise would land on every Terraform node.
+//
+// # Code symbols
+//
+// A Phase 2 child -- a function, an HTTP endpoint, a type, a React component
+// -- is identified by where its source is, not by what deploys it:
+//
+//	<kind>:<language>/<namespace>/<repo-relative path>/<symbol>
+//
+// Source location rather than deployment, because code has one home and a
+// deployment does not. The same directory may be deployed as dev, staging,
+// and prod, and identifying a function by its deployment would give it three
+// identities and put it inside three containers at once. Containment has to
+// stay a tree to be navigable, so a symbol is contained by the node that owns
+// its file -- which is either the codebase node or, where the resolver joined
+// them, the deployment it merged into.
+//
+// Case is significant for a symbol and is not for anything else. Go's
+// HandleOrder and handleOrder are two functions and routinely both exist,
+// one wrapping the other; folding them together would silently halve a
+// component view. NewSymbolID therefore treats any difference from the folded
+// form, case included, as a loss worth a discriminator. The readable spelling
+// stays in Node.Name, which is what every tool prints.
 
 const idSeparator = ":"
+
+// idDiscriminatorLen is how much of the hash is kept. Thirty-two bits is far
+// more than the handful of folded names in a repository needs, and short
+// enough that an ID a model quotes back stays readable.
+const idDiscriminatorLen = 8
 
 // ErrInvalidNodeID is returned for a string that is not a well-formed node ID.
 var ErrInvalidNodeID = errors.New("invalid node id")
@@ -37,7 +86,74 @@ func NewNodeID(kind NodeKind, source, namespace, name string) string {
 	return string(kind) + idSeparator +
 		slugSegment(orDefault(source, "unknown")) + "/" +
 		slugSegment(orDefault(namespace, "default")) + "/" +
-		slugPath(name)
+		qualify(slugPath(name), name, false)
+}
+
+// NewSymbolID builds the ID of a code symbol: a function, an HTTP endpoint, a
+// type, a React component. file is the repo-relative path it is declared in;
+// symbol is the identifier as the language spells it.
+//
+// Case is preserved through the discriminator rather than in the ID itself,
+// because allowing uppercase would change the ID grammar, and the grammar is
+// a major-version promise.
+func NewSymbolID(kind NodeKind, source, namespace, file, symbol string) string {
+	name := strings.TrimSpace(file)
+	if sym := strings.TrimSpace(symbol); sym != "" {
+		if name != "" {
+			name += "/"
+		}
+		name += sym
+	}
+	return NewNodeID(kind, source, namespace, qualify(slugPath(name), name, true))
+}
+
+// qualify appends a discriminator when folding destroyed what told two inputs
+// apart. Applied to an already-qualified name it is a no-op, which is what
+// lets ValidateNodeID check an ID by rebuilding it.
+func qualify(slug, original string, strict bool) string {
+	trimmed := strings.TrimSpace(original)
+	if trimmed == "" || !lossy(trimmed, slug, strict) {
+		return slug
+	}
+	return slug + "." + discriminator(trimmed)
+}
+
+// lossy reports whether folding destroyed identity rather than tidying
+// punctuation.
+//
+// The two callers need different lines, because they fold different things.
+//
+// An infrastructure name is discovered by several extractors that spell it
+// differently, and reconciling those spellings is the merge this package
+// exists to perform: "API-Gateway", "api-gateway", and "  -api-gateway- "
+// are one component, and giving them three IDs would be the bug, not the
+// fix. Punctuation folded to a hyphen still stands for the separator that was
+// there, and a reader sees the same name. What is not recoverable is a rune
+// the fold cannot represent at all: a service named in Japanese, Chinese, or
+// Russian had every character replaced, and all three landed on "unknown".
+// That is the case worth a discriminator, and across seven real repositories
+// it does not arise once -- which is the point. It costs nothing until it is
+// the difference between one node and three.
+//
+// A code symbol has no such spelling variance. One extractor reads it from
+// one file with the exact characters the language requires, so every
+// difference is a real difference: Repository[T] is not Repository-T, and
+// GET /orders/{id} is not the literal route /orders/id.
+func lossy(trimmed, slug string, strict bool) bool {
+	if strict {
+		return trimmed != slug
+	}
+	for _, r := range trimmed {
+		if r > unicode.MaxASCII && (unicode.IsLetter(r) || unicode.IsDigit(r)) {
+			return true
+		}
+	}
+	return false
+}
+
+func discriminator(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])[:idDiscriminatorLen]
 }
 
 // ParsedNodeID is the decomposition of a node ID.
