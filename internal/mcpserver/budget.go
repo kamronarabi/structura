@@ -124,9 +124,6 @@ func (r *Response) Total() int {
 	return r.total
 }
 
-// Remaining reports the unspent budget.
-func (r *Response) Remaining() int { return r.budget - r.used }
-
 // String renders the response, appending a truncation notice when one is
 // needed.
 //

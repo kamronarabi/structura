@@ -162,10 +162,3 @@ func (s *Source) rescan(ctx context.Context) (schema.Graph, error) {
 	s.graph, s.loaded, s.lastCheck = res.Graph, true, time.Now()
 	return s.graph, nil
 }
-
-// Invalidate forces the next call to recheck.
-func (s *Source) Invalidate() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.loaded = false
-}

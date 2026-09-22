@@ -310,6 +310,14 @@ func weakestLink(path []schema.Edge) float64 {
 }
 
 // pathKey renders a path for deterministic ordering.
+//
+// It is the last tie-break, and removing it currently changes no output: the
+// search expands each node's edges sorted by target, so routes are already
+// discovered in the order this produces, and sort.SliceStable keeps them
+// there. It is kept because that is a property of the search rather than of
+// the ordering, and a reader of this comparator should not have to go and
+// check the search to know whether two equally good routes come back in a
+// fixed order.
 func pathKey(path []schema.Edge) string {
 	var b strings.Builder
 	for _, e := range path {
