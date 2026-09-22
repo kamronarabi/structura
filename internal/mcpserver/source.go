@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
 	"time"
 
@@ -83,16 +82,16 @@ func (s *Source) Graph(ctx context.Context) (schema.Graph, error) {
 // isStale reports whether anything an extractor would read is newer than the
 // stored graph.
 func (s *Source) isStale(ctx context.Context, stored schema.Graph) (stale bool, reason string, err error) {
-	info, err := os.Stat(graphio.Path(s.root))
-	if err != nil {
-		return true, "the stored graph is unreadable", nil //nolint:nilerr // rebuilding is the remedy
+	written, ok := graphio.ModTime(s.root)
+	if !ok {
+		return true, "the stored graph is unreadable", nil
 	}
 
 	walk, err := scan.Walk(ctx, s.root, s.registry, scan.WalkOptions{})
 	if err != nil {
 		return false, "", err
 	}
-	if walk.Newest > info.ModTime().Unix() {
+	if walk.Newest > written {
 		return true, "a manifest has changed since the graph was written", nil
 	}
 	// A graph written by a different build of the binary may not mean what
