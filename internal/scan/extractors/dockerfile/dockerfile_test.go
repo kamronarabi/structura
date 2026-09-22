@@ -42,6 +42,10 @@ func (c *capture) node(t *testing.T) schema.Node {
 	return c.nodes[0]
 }
 
+// newExtractor is the constructor under test, named so that the name check
+// does not read as a tautology over a local variable.
+func newExtractor() *dockerfile.Extractor { return dockerfile.New() }
+
 func extract(t *testing.T, filePath, content string) *capture {
 	t.Helper()
 	c := &capture{}
@@ -269,8 +273,10 @@ func TestEnvReferencesBecomeHints(t *testing.T) {
 	c := extract(t, "api/Dockerfile", strings.Join([]string{
 		"FROM golang:1.22",
 		"ENV DATABASE_URL=postgres://orders-db:5432/orders",
+		"ENV API_BASE_URL=https://api.example.com",
+		// Not a location, so not a reference: matching "production" against
+		// every name in the repository is how a resolver invents edges.
 		"ENV NODE_ENV production",
-		"ARG API_BASE_URL=https://api.example.com",
 	}, "\n"))
 
 	if len(c.hints) != 2 {
@@ -284,11 +290,17 @@ func TestEnvReferencesBecomeHints(t *testing.T) {
 			if h.SuggestedEdge != schema.EdgePersistsTo {
 				t.Errorf("DATABASE_URL edge = %q, want persists_to", h.SuggestedEdge)
 			}
+			if h.Port != 5432 {
+				t.Errorf("Port = %d, want 5432", h.Port)
+			}
 			if h.FromNode == "" {
 				t.Error("the hint is not attached to the component the Dockerfile builds")
 			}
 		case "api.example.com":
 			sawAPI = true
+			if h.SuggestedEdge != schema.EdgeCalls {
+				t.Errorf("an https endpoint gave edge %q, want calls", h.SuggestedEdge)
+			}
 		}
 	}
 	if !sawDB || !sawAPI {

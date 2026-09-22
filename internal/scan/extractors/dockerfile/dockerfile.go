@@ -39,6 +39,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -136,7 +137,7 @@ func (e *Extractor) Extract(_ context.Context, f *scan.File, emit scan.Emitter) 
 	if n := len(stages); n > 1 {
 		attrs["buildStages"] = n
 	}
-	if ports := exposedPorts(instructions); len(ports) > 0 {
+	if ports := exposedPorts(instructions, buildArgs(instructions)); len(ports) > 0 {
 		attrs["ports"] = ports
 	}
 
@@ -181,14 +182,25 @@ func (e *Extractor) Extract(_ context.Context, f *scan.File, emit scan.Emitter) 
 	return nil
 }
 
-// emitReferences turns ENV and ARG values that name a location into hints.
+// emitReferences turns ENV values that name a location into hints.
 //
-// A build argument or a baked-in environment variable pointing at a database
-// or an API is the same reference a .env file would carry, and reaching it
-// needs no more than the file in hand.
+// An environment variable baked into the image pointing at a database or an
+// API is the same reference a .env file would carry, and reaching it needs no
+// more than the file in hand.
+//
+// ARG is read for ports and never for references, because a build argument
+// does not exist in the running container: it is a parameter to the build, and
+// its default is the value for whoever builds without supplying one. Drawing a
+// component from one would put a build-time placeholder on the diagram.
+//
+// The known cost is the promotion idiom, ARG API_URL followed by ENV
+// API_URL=$API_URL, where the endpoint really is baked in and this reports
+// nothing. Resolving it would mean substituting build defaults into hostnames,
+// and those defaults are localhost and example.com far more often than they
+// are a real dependency. A gap is visible; a wrong edge is not.
 func (e *Extractor) emitReferences(f *scan.File, emit scan.Emitter, id string, instructions []instruction) {
 	for _, ins := range instructions {
-		if ins.keyword != "ENV" && ins.keyword != "ARG" {
+		if ins.keyword != "ENV" {
 			continue
 		}
 		for _, a := range assignments(ins.keyword, ins.args) {
@@ -349,17 +361,24 @@ func resolveBase(stages []stage, idx int) string {
 // Every stage's EXPOSE is taken, not just the shipped stage's: a port declared
 // in a builder stage is still the port this component listens on, and
 // distinguishing them buys nothing a reader would use.
-func exposedPorts(instructions []instruction) []int {
+//
+// "EXPOSE $PORT" is read through the file's own ARG and ENV defaults, because
+// otherwise the answer is worse than nothing: the file that prompted this
+// writes ARG PORT=80 and then EXPOSE $PORT 9229 9230, and reporting the two
+// debug ports while dropping the one the service actually listens on is a
+// confident wrong answer rather than a gap.
+func exposedPorts(instructions []instruction, args map[string]string) []int {
 	seen := map[int]bool{}
 	for _, ins := range instructions {
 		if ins.keyword != "EXPOSE" {
 			continue
 		}
-		for _, field := range strings.Fields(ins.args) {
+		for _, field := range strings.Fields(substitute(ins.args, args)) {
 			// "8080/tcp" and "8080/udp" are the same port to a reader.
 			spec, _, _ := strings.Cut(field, "/")
 			port, err := strconv.Atoi(spec)
-			// "EXPOSE $PORT" is decided at run time and names no port here.
+			// A variable nothing in the file defines is decided at run time
+			// and names no port here.
 			if err != nil || port <= 0 || port > 65535 {
 				continue
 			}
@@ -372,6 +391,60 @@ func exposedPorts(instructions []instruction) []int {
 	}
 	sort.Ints(out)
 	return out
+}
+
+// buildArgs collects the values the file sets for itself, in order, so that
+// later instructions written in terms of them can be read.
+//
+// These are used for ports and nothing else. A port is a fact about the image:
+// whoever wrote ARG PORT=80 is saying the process listens on 80, and an
+// override changes a number. A hostname default is a different thing -- it is
+// the value for whoever builds without supplying one, which in practice is
+// nobody -- so ENV values holding a variable stay unresolved and emit no
+// reference. Substituting there would put a build-time placeholder on the
+// diagram as a component, which is the mistake the .env extractor exists to
+// avoid.
+func buildArgs(instructions []instruction) map[string]string {
+	out := map[string]string{}
+	for _, ins := range instructions {
+		if ins.keyword != "ENV" && ins.keyword != "ARG" {
+			continue
+		}
+		for _, a := range assignments(ins.keyword, ins.args) {
+			// Resolved as it is stored, so that the ARG PORT=80 / ENV PORT
+			// $PORT pair -- which is how a Dockerfile promotes a build
+			// argument into the image -- lands on 80 rather than on "$PORT".
+			out[a.key] = substitute(a.value, out)
+		}
+	}
+	return out
+}
+
+// variablePattern matches $NAME and ${NAME}. Shell's default and substring
+// forms, ${NAME:-x} and the rest, are deliberately not matched: a value that
+// needs them is not one a simple reading understands, and it stays as written
+// so that nothing downstream mistakes it for a resolved one.
+var variablePattern = regexp.MustCompile(`\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))`)
+
+// substitute replaces variables the file defined. One pass, so a value
+// defined in terms of itself cannot loop, and anything undefined is left as
+// written rather than becoming an empty string -- an empty string looks like
+// an answer.
+func substitute(text string, args map[string]string) string {
+	if !strings.Contains(text, "$") || len(args) == 0 {
+		return text
+	}
+	return variablePattern.ReplaceAllStringFunc(text, func(match string) string {
+		groups := variablePattern.FindStringSubmatch(match)
+		name := groups[1]
+		if name == "" {
+			name = groups[2]
+		}
+		if value, ok := args[name]; ok && !strings.Contains(value, "$") {
+			return value
+		}
+		return match
+	})
 }
 
 // stage is one FROM in a Dockerfile.
@@ -518,10 +591,18 @@ type instruction struct {
 // parse reads Dockerfile syntax far enough to find the instructions that say
 // something architectural.
 //
-// This is deliberately not a Dockerfile implementation. Heredocs, the escape
-// directive, and shell semantics inside RUN are all real and none of them can
-// produce a base image, a port, or a hostname that this reading would miss.
-// Anything not understood is skipped rather than guessed at.
+// This is deliberately not a Dockerfile implementation. The escape directive
+// and shell semantics inside RUN are real and neither can produce a base
+// image, a port, or a hostname that this reading would miss. Anything not
+// understood is skipped rather than guessed at.
+//
+// Heredocs are the exception, and are handled rather than ignored. Two in five
+// of the Dockerfiles in the test corpus use one, and their contents are
+// arbitrary text: a script that writes a configuration file can easily hold a
+// line beginning with ENV or FROM, which a line-by-line reading would take for
+// an instruction of this build. Reading a value out of someone else's file and
+// attributing it to this component is the kind of mistake that is invisible
+// afterwards.
 func parse(content []byte) []instruction {
 	content = bytes.TrimPrefix(content, []byte{0xEF, 0xBB, 0xBF})
 	lines := strings.Split(string(content), "\n")
@@ -530,10 +611,22 @@ func parse(content []byte) []instruction {
 		out       []instruction
 		joined    strings.Builder
 		startLine int
+		// heredocs holds the terminators still open, because one instruction
+		// may open several: COPY <<A <<B dest is legal.
+		heredocs []string
 	)
 	for i, raw := range lines {
 		line := strings.TrimSuffix(raw, "\r")
 		trimmed := strings.TrimSpace(line)
+
+		if len(heredocs) > 0 {
+			// A terminator is matched against the line as written, except
+			// that <<- allows it to be indented.
+			if trimmed == heredocs[0] || line == heredocs[0] {
+				heredocs = heredocs[1:]
+			}
+			continue
+		}
 
 		// A comment inside a continuation is dropped by the builder rather
 		// than ending it, so the same rule applies whether or not one is
@@ -560,15 +653,39 @@ func parse(content []byte) []instruction {
 			continue
 		}
 
-		if ins, ok := instructionOf(joined.String(), startLine); ok {
+		text := joined.String()
+		joined.Reset()
+		if ins, ok := instructionOf(text, startLine); ok {
 			out = append(out, ins)
 		}
-		joined.Reset()
+		// The body starts on the line after the instruction that opened it,
+		// which is why this is checked once the continuations are joined.
+		heredocs = heredocTerminators(text)
 	}
 	// A file ending mid-continuation still stated what it stated.
 	if joined.Len() > 0 {
 		if ins, ok := instructionOf(joined.String(), startLine); ok {
 			out = append(out, ins)
+		}
+	}
+	return out
+}
+
+// heredocPattern matches a heredoc redirection and captures its terminator.
+// The word may be quoted, which in shell means no expansion and here means
+// nothing: either way it ends the body.
+var heredocPattern = regexp.MustCompile(`<<-?\s*(?:"([^"]+)"|'([^']+)'|([A-Za-z_][A-Za-z0-9_]*))`)
+
+// heredocTerminators lists the words that close the bodies an instruction
+// opened, in the order they must appear.
+func heredocTerminators(text string) []string {
+	var out []string
+	for _, m := range heredocPattern.FindAllStringSubmatch(text, -1) {
+		for _, group := range m[1:] {
+			if group != "" {
+				out = append(out, group)
+				break
+			}
 		}
 	}
 	return out

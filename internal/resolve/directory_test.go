@@ -186,3 +186,94 @@ func TestDirectoryHintsBindToTheSurvivor(t *testing.T) {
 		t.Errorf("the .env reference did not reach the surviving component: %v", r.edgeList())
 	}
 }
+
+// The surviving node was chosen because it is the better description, so a
+// conflict is resolved in its favour rather than by whichever was indexed
+// last.
+func TestTheSurvivorsOwnFactsAreNotOverwritten(t *testing.T) {
+	b := &builder{}
+	b.codebase("manifest", "go", "acme/api", "api", false,
+		schema.Attrs{"baseImage": "golang:1.22", "ports": []int{8080}})
+	b.codebase("dockerfile", "go", "api", "api", true,
+		schema.Attrs{"baseImage": "alpine:3.20", "ports": []int{9999}})
+
+	n := b.run().node(t, "acme/api")
+	if n.Attrs["baseImage"] != "golang:1.22" {
+		t.Errorf("baseImage = %v, want the survivor's own", n.Attrs["baseImage"])
+	}
+	if ports, _ := n.Attrs["ports"].([]int); len(ports) != 1 || ports[0] != 8080 {
+		t.Errorf("ports = %v, want the survivor's own", n.Attrs["ports"])
+	}
+}
+
+// A relationship that landed on the node that was folded away has to move to
+// the one that survived. Dropping it would make the fold cost an edge.
+func TestEdgesIntoTheAbsorbedComponentAreRewritten(t *testing.T) {
+	b := &builder{}
+	b.codebase("manifest", "go", "acme/api", "api", false, nil)
+	absorbed := b.codebase("dockerfile", "go", "api", "api", true, nil)
+	caller := b.node(schema.KindService, "compose", "shop", "gateway", nil)
+
+	b.in.Edges = append(b.in.Edges, schema.Edge{
+		From: caller, To: absorbed, Kind: schema.EdgeCalls, Confidence: schema.ConfDeclared,
+		Evidence: []schema.Evidence{{Extractor: "compose", Rule: "compose_depends_on"}},
+	})
+
+	r := b.run()
+	if !r.hasEdge("gateway", "acme/api") {
+		t.Errorf("the relationship did not follow the fold; found %v", r.edgeList())
+	}
+}
+
+// Three files, one component: a Dockerfile and a manifest fold into each
+// other, and the result folds into the container that runs it. The merge
+// chain has to resolve all the way through or a node survives with no edges.
+func TestDockerfileManifestAndDeploymentCollapseToOne(t *testing.T) {
+	b := &builder{}
+	b.codebase("manifest", "go", "acme/checkout", "services/checkout", false, nil)
+	b.codebase("dockerfile", "go", "checkout", "services/checkout", true,
+		schema.Attrs{"baseImage": "gcr.io/distroless/static", "ports": []int{8080}})
+	deployment := b.node(schema.KindService, "compose", "shop", "checkout", schema.Attrs{
+		"image": "checkout:1", "buildContext": "services/checkout",
+	})
+	b.in.Nodes[len(b.in.Nodes)-1].Sources = []schema.Source{
+		{Extractor: "compose", Path: "docker-compose.yml", Line: 2},
+	}
+	db := b.node(schema.KindDatastore, "compose", "shop", "orders-db", nil)
+	b.in.Edges = append(b.in.Edges, schema.Edge{
+		From: deployment, To: db, Kind: schema.EdgePersistsTo, Confidence: schema.ConfDeclared,
+		Evidence: []schema.Evidence{{Extractor: "compose", Rule: "compose_depends_on"}},
+	})
+
+	r := b.run()
+	if len(r.Nodes) != 2 {
+		t.Fatalf("nodes = %d, want the service and its database: %+v", len(r.Nodes), r.Nodes)
+	}
+	n := r.node(t, "checkout")
+	if n.Tech == nil || n.Tech.Language != "go" {
+		t.Errorf("Tech = %+v, want language go", n.Tech)
+	}
+	if n.Attrs["baseImage"] != "gcr.io/distroless/static" {
+		t.Errorf("the base image did not survive two merges: %+v", n.Attrs)
+	}
+	if n.Attrs["module"] != nil && n.Attrs["directory"] != "services/checkout" {
+		t.Errorf("the codebase's directory did not survive: %+v", n.Attrs)
+	}
+	if !r.hasEdge("checkout", "orders-db") {
+		t.Errorf("the relationship was lost; found %v", r.edgeList())
+	}
+	if len(n.Sources) != 3 {
+		t.Errorf("Sources = %d, want all three files recorded", len(n.Sources))
+	}
+}
+
+// A codebase with no directory is not a candidate for a fold keyed on one.
+func TestNodesWithoutADirectoryAreNotFolded(t *testing.T) {
+	b := &builder{}
+	b.node(schema.KindService, "k8s", "prod", "api", schema.Attrs{"nameFrom": "directory"})
+	b.node(schema.KindService, "k8s", "prod", "other", nil)
+
+	if got := len(b.run().Nodes); got != 2 {
+		t.Errorf("nodes = %d, want 2", got)
+	}
+}
