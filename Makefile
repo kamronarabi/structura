@@ -123,7 +123,7 @@ corpus:
 corpus-test:
 	go test -tags corpus ./internal/resolve/... -v
 
-## eval: ask a model 15 architecture questions through the MCP tools
+## eval: ask a model 18 architecture questions through the MCP tools
 # Not part of `check`: it calls the API, it costs money, and it is
 # nondeterministic. A flaky gate gets disabled, and then it stops being run at
 # all. Run it per milestone and before each release.

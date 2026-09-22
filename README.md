@@ -297,8 +297,8 @@ for.
 
 The remaining four repositories have no architecture to get right — a
 grab-bag of Kubernetes examples, a hundred unrelated Compose stacks, a
-Terraform module library, and `bitnami/charts`, which yields 417 nodes and
-four real relationships from 4,122 files. Scoring them would measure nothing,
+Terraform module library, and `bitnami/charts`, which yields 241 nodes and
+eight real relationships from 4,122 files. Scoring them would measure nothing,
 so instead each has the shape of its result pinned: how much was found, of
 what kinds, by which rules, and what could not be read. That is stability, not
 correctness, and the distinction is deliberate.
