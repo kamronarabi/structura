@@ -294,6 +294,23 @@ so instead each has the shape of its result pinned: how much was found, of
 what kinds, by which rules, and what could not be read. That is stability, not
 correctness, and the distinction is deliberate.
 
+### Does the graph actually help a model
+
+The corpus above measures the graph. This measures the product: eighteen
+architecture questions asked through the MCP tools, scored on whether the
+answer contains the facts a correct answer needs, and on how many tool calls
+it took to get there.
+
+```
+score       18/18
+tool calls  70 total, 3.9 per question
+```
+
+Against `claude-opus-5` on 2026-09-22 (`make eval`). A graph can be
+structurally perfect and still useless if the tool surface makes a model take
+six calls to learn what one should have told it, so the call count is part of
+the result rather than a footnote to it.
+
 ## What it does not do
 
 Worth knowing before you try it:
