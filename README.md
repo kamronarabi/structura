@@ -159,13 +159,13 @@ Components
   boundary        prod
 
 Relationships
-  public       exposes      api-gateway            (0.95)
-  public       exposes      checkout               (0.95)
+  api-gateway  calls        checkout               (0.80)
   api-gateway  persists_to  session-cache          (0.80)
   api-gateway  calls        analytics.example.com  (0.70)
-  api-gateway  calls        checkout               (0.80)
   checkout     persists_to  orders-db              (0.80)
   checkout     calls        api.stripe.com         (0.80)
+  public       exposes      api-gateway            (0.95)
+  public       exposes      checkout               (0.95)
 
 Diagnostics
   info  unresolved_reference         deploy/prod/api-gateway.yaml:4
@@ -230,19 +230,28 @@ line it fired on:
 
 ```json
 {
-  "from": "service:k8s/prod/api-gateway",
-  "to": "datastore:k8s/prod/session-cache",
+  "id": "e:70ea54e717f8",
+  "from": "container:@prod/api-gateway",
+  "to": "container:@prod/session-cache",
   "kind": "persists_to",
-  "confidence": 0.80,
-  "evidence": [{
-    "extractor": "k8s",
-    "rule": "dns_exact",
-    "path": "deploy/prod/api-gateway.yaml",
-    "line": 4,
-    "detail": "container \"api\" env REDIS_URL=redis://session-cache:6379/0 (resolves to session-cache)"
-  }]
+  "protocol": "redis",
+  "confidence": 0.8,
+  "evidence": [
+    {
+      "extractor": "k8s",
+      "path": "deploy/prod/api-gateway.yaml",
+      "line": 4,
+      "rule": "dns_exact",
+      "detail": "container \"api\" env REDIS_URL=redis://session-cache:6379/0 (resolves to session-cache)"
+    }
+  ]
 }
 ```
+
+An identifier says what a component is called and where it lives —
+`container:@prod/api-gateway` — and nothing about which file or extractor
+found it, so two readings of one component share an identifier instead of
+becoming two boxes.
 
 Shipping imperfect inference is fine. Shipping imperfect inference that
 presents itself as certain is not — especially when a model is about to reason
@@ -382,8 +391,14 @@ because the file gets committed and is then read by builds that are not the
 one that wrote it. A minor bump is additive and only additive — new optional
 fields, new node or edge kinds — so a reader built for an earlier minor still
 understands everything it recognizes. Anything that removes a field, retypes
-one, or changes what an existing kind means is a major bump. Those rules hold
-at `0.x` too, where SemVer would permit otherwise.
+one, or changes what an existing kind means is a major bump.
+
+The format is at `1.0.0`, which is a commitment rather than a milestone: the
+fields and identifier grammar described there will not change shape again
+without a `2.0.0`. It reached 1.0 before the CLI did because the file is the
+part other things depend on — it gets committed, diffed, and read by builds
+that are not the one that wrote it — and a format that keeps moving is not one
+anybody can build on.
 
 A build reading a graph from a *newer* schema serves it as it is rather than
 rescanning over it, since rewriting would delete whatever that build cannot
