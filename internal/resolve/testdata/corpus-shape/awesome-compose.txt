@@ -4,6 +4,7 @@ awesome-compose
   edges       114
   connected   56 of 81 components
   clusters    39
+  redundant   54 of 119 nodes
 
   nodes by kind
     boundary                           38
@@ -27,6 +28,20 @@ awesome-compose
     compose_depends_on                 26
     compose_project_member             80
     name_exact                         13
+
+  components drawn more than once
+    backend                            14
+    db                                 16
+    frontend                           7
+    minecraft                          2
+    mongo                              2
+    nc                                 2
+    portainer                          2
+    proxy                              5
+    redis                              3
+    sparkjava                          2
+    web                                9
+    wireguard                          2
 
   diagnostics
     info env_placeholder_reference     1

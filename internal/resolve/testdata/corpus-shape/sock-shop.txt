@@ -1,34 +1,54 @@
 sock-shop
   files       197 scanned, 104 parsed
-  nodes       74
-  edges       79
-  connected   30 of 66 components
+  nodes       71
+  edges       76
+  connected   30 of 63 components
   clusters    18
+  redundant   17 of 71 nodes
 
   nodes by kind
     boundary                           8
     cloud_resource                     3
     datastore                          7
     queue                              2
-    service                            54
+    service                            51
 
   nodes by layer
-    container                          66
+    container                          63
     context                            8
 
   edges by kind
     calls                              3
-    contains                           54
+    contains                           51
     depends_on                         20
     persists_to                        2
 
   edges by rule
     compose_depends_on                 20
-    compose_project_member             26
+    compose_project_member             23
     dns_exact                          2
     k8s_namespace_member               28
     name_exact                         1
     terraform_reference                2
+
+  components drawn more than once
+    alertmanager                       2
+    carts                              2
+    carts-db                           2
+    catalogue                          2
+    catalogue-db                       2
+    elasticsearch                      2
+    front-end                          2
+    helm-chart                         2
+    kibana                             2
+    orders                             2
+    orders-db                          2
+    payment                            2
+    queue-master                       2
+    rabbitmq                           2
+    shipping                           2
+    user                               2
+    user-db                            2
 
   diagnostics
     info helm_values_inferred          1

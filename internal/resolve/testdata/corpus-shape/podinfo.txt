@@ -4,6 +4,7 @@ podinfo
   edges       23
   connected   5 of 22 components
   clusters    7
+  redundant   7 of 27 nodes
 
   nodes by kind
     boundary                           5
@@ -23,6 +24,12 @@ podinfo
     dns_exact                          1
     k8s_namespace_member               14
     name_exact                         2
+
+  components drawn more than once
+    backend                            3
+    frontend                           3
+    otel                               2
+    podinfo                            3
 
   diagnostics
     info helm_values_inferred          2

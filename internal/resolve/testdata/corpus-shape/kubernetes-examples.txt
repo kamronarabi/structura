@@ -1,18 +1,19 @@
 kubernetes-examples
   files       454 scanned, 187 parsed
-  nodes       111
+  nodes       110
   edges       100
-  connected   7 of 108 components
-  clusters    15
+  connected   7 of 107 components
+  clusters    14
+  redundant   2 of 110 nodes
 
   nodes by kind
     boundary                           3
     cloud_resource                     19
     datastore                          14
-    service                            75
+    service                            74
 
   nodes by layer
-    container                          108
+    container                          107
     context                            3
 
   edges by kind
@@ -24,8 +25,13 @@ kubernetes-examples
     dns_exact                          4
     k8s_namespace_member               96
 
+  components drawn more than once
+    redis                              2
+    spark-master-controller            2
+
   diagnostics
-    info code_joined_to_deployment     3
+    info code_join_crosses_projects    4
+    info code_joined_to_deployment     4
     info k8s_service_without_selector  1
     info service_selects_many          9
     info unmatched_service_selector    12

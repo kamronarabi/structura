@@ -116,6 +116,7 @@ func shapeReport(repo string, g schema.Graph) []byte {
 	fmt.Fprintf(&b, "  edges       %d\n", g.Stats.EdgeCount)
 	fmt.Fprintf(&b, "  connected   %d of %d components\n", g.Stats.Connected, components(g))
 	fmt.Fprintf(&b, "  clusters    %d\n", g.Stats.Clusters)
+	fmt.Fprintf(&b, "  redundant   %d of %d nodes\n", redundantNodes(g), len(g.Nodes))
 
 	byKind := map[string]int{}
 	byLayer := map[string]int{}
@@ -145,8 +146,57 @@ func shapeReport(repo string, g schema.Graph) []byte {
 	section(&b, "nodes by layer", byLayer)
 	section(&b, "edges by kind", edgeKind)
 	section(&b, "edges by rule", byRule)
+	section(&b, "components drawn more than once", duplicatedNames(g))
 	section(&b, "diagnostics", byCode)
 	return b.Bytes()
+}
+
+// A component drawn twice is the most visible thing a reader can be wrong
+// about, and until this line existed nothing counted it: precision grades the
+// edges that were drawn and says nothing about the boxes. The golden fixtures
+// all describe a system deployed one way, so they show almost none of it,
+// while real repositories -- a Helm chart beside raw manifests, a Compose file
+// beside a cluster -- were running at a quarter to two fifths of their nodes
+// being another node again.
+//
+// It is reported rather than gated because a share of it is correct, and the
+// share differs per repository. Three environments of one service really are
+// three components. awesome-compose is a hundred unrelated sample stacks and
+// fourteen of them have a "backend", which is not one component drawn
+// fourteen times. The number means what it says on the three repositories
+// that are a single coherent system, and on the others it is a tripwire.
+// What it has to do everywhere is move only when someone meant it to.
+
+// redundantNodes counts the nodes beyond the first that share a name with
+// another, which is the number of boxes a reader sees twice.
+func redundantNodes(g schema.Graph) int {
+	total := 0
+	for _, count := range nameCounts(g) {
+		if count > 1 {
+			total += count - 1
+		}
+	}
+	return total
+}
+
+// duplicatedNames names them, so that a change to this number says which
+// component moved rather than only that one did.
+func duplicatedNames(g schema.Graph) map[string]int {
+	out := map[string]int{}
+	for name, count := range nameCounts(g) {
+		if count > 1 {
+			out[name] = count
+		}
+	}
+	return out
+}
+
+func nameCounts(g schema.Graph) map[string]int {
+	out := map[string]int{}
+	for _, n := range g.Nodes {
+		out[n.Name]++
+	}
+	return out
 }
 
 func section(b *bytes.Buffer, title string, counts map[string]int) {

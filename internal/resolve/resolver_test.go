@@ -777,9 +777,16 @@ func TestADisambiguatedMatchScoresBelowAnUnambiguousOne(t *testing.T) {
 	// locality gate cannot separate them. What decides is the kind the
 	// reference implies: a redis:// URL means the datastore. Correct, and a
 	// decision nonetheless.
+	//
+	// The two come from different formats, which is the shape this ambiguity
+	// really has: one Compose project cannot hold two services called cache,
+	// and two files of one format that do are folded before matching runs. A
+	// Compose file and a cluster manifest both declaring "cache" are not
+	// folded, because whether two formats describe one component or two is a
+	// question neither file answers.
 	b := &builder{}
 	store := b.node(schema.KindDatastore, "compose", "shop", "cache", nil)
-	b.node(schema.KindService, "compose", "shop", "cache", nil)
+	b.node(schema.KindService, "k8s", "shop", "cache", nil)
 	api := b.node(schema.KindService, "compose", "shop", "api", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintConnString,

@@ -4,6 +4,7 @@ terraform-aws-vpc
   edges       19
   connected   15 of 47 components
   clusters    35
+  redundant   23 of 48 nodes
 
   nodes by kind
     boundary                           1
@@ -18,6 +19,11 @@ terraform-aws-vpc
 
   edges by rule
     terraform_reference                19
+
+  components drawn more than once
+    disabled                           12
+    vpc                                11
+    wrapper                            3
 
   diagnostics
     info terraform_external_module     4

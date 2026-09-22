@@ -277,3 +277,95 @@ func TestNodesWithoutADirectoryAreNotFolded(t *testing.T) {
 		t.Errorf("nodes = %d, want 2", got)
 	}
 }
+
+// The case this fold exists for. docker-compose.yml gives carts-db an image
+// and it becomes a datastore; docker-compose.logging.yml mentions the same
+// service to attach a log driver, names no image, and gets the fallback. One
+// Compose project cannot hold two services called carts-db.
+func TestOneFormatDisagreeingAboutKindIsOneComponent(t *testing.T) {
+	b := &builder{}
+	b.node(schema.KindDatastore, "compose", "docker-compose", "carts-db",
+		schema.Attrs{"image": "mongo:3.4"})
+	b.node(schema.KindService, "compose", "docker-compose", "carts-db", nil)
+
+	r := b.run()
+	if len(r.Nodes) != 1 {
+		t.Fatalf("nodes = %d, want 1: %+v", len(r.Nodes), r.Nodes)
+	}
+	// The node that named an image is where the kind came from; the other was
+	// not classified, it was defaulted.
+	if r.Nodes[0].Kind != schema.KindDatastore {
+		t.Errorf("Kind = %q, want datastore", r.Nodes[0].Kind)
+	}
+}
+
+// Which one survives cannot depend on the order they arrived in, or two scans
+// of one tree disagree.
+func TestTheClassifiedNodeSurvivesWhicheverOrderTheyArrive(t *testing.T) {
+	for _, reversed := range []bool{false, true} {
+		b := &builder{}
+		if reversed {
+			b.node(schema.KindService, "compose", "shop", "queue", nil)
+			b.node(schema.KindQueue, "compose", "shop", "queue", schema.Attrs{"image": "rabbitmq:3"})
+		} else {
+			b.node(schema.KindQueue, "compose", "shop", "queue", schema.Attrs{"image": "rabbitmq:3"})
+			b.node(schema.KindService, "compose", "shop", "queue", nil)
+		}
+		r := b.run()
+		if len(r.Nodes) != 1 || r.Nodes[0].Kind != schema.KindQueue {
+			t.Errorf("reversed=%v gave %+v, want one queue", reversed, r.Nodes)
+		}
+	}
+}
+
+// A namespace, a Compose project and a chart are named after what they
+// contain. Folding a boundary into its own contents would collapse the
+// containment the graph is built on.
+func TestABoundaryIsNotFoldedIntoWhatItContains(t *testing.T) {
+	b := &builder{}
+	b.node(schema.KindBoundary, "helm", "helm-chart", "helm-chart", nil)
+	b.node(schema.KindService, "helm", "helm-chart", "helm-chart", nil)
+
+	if got := len(b.run().Nodes); got != 2 {
+		t.Errorf("nodes = %d, want 2: a chart is not the workload it deploys", got)
+	}
+}
+
+// The boundary this fold must not reach across. Two declared projects each
+// holding a "prod" namespace and an "api" are not one api.
+func TestKindConflictFoldStaysInsideOneProject(t *testing.T) {
+	b := &builder{}
+	b.node(schema.KindDatastore, "k8s", "prod", "db",
+		schema.Attrs{"image": "postgres:16", "project": "samples/alpha"})
+	b.node(schema.KindService, "k8s", "prod", "db",
+		schema.Attrs{"project": "samples/beta"})
+
+	if got := len(b.run().Nodes); got != 2 {
+		t.Errorf("nodes = %d, want 2: two projects are two systems", got)
+	}
+}
+
+// Whether a chart and a cluster manifest describe one component or two is a
+// question neither file answers, so this fold does not answer it either. The
+// gap is pinned rather than left to be discovered again.
+func TestTwoFormatsNamingOneThingAreNotFolded(t *testing.T) {
+	b := &builder{}
+	b.node(schema.KindService, "helm", "helm-chart", "adservice", nil)
+	b.node(schema.KindService, "k8s", "default", "adservice", nil)
+
+	if got := len(b.run().Nodes); got != 2 {
+		t.Errorf("nodes = %d, want 2 until this is decided deliberately", got)
+	}
+}
+
+// Two namespaces of one format are two deployments of one service, which is
+// what a dev and a prod overlay are. Names alone must not fold them.
+func TestOneFormatInTwoNamespacesIsNotFolded(t *testing.T) {
+	b := &builder{}
+	b.node(schema.KindDatastore, "k8s", "dev", "db", schema.Attrs{"image": "postgres:16"})
+	b.node(schema.KindService, "k8s", "prod", "db", nil)
+
+	if got := len(b.run().Nodes); got != 2 {
+		t.Errorf("nodes = %d, want 2: dev and prod are two deployments", got)
+	}
+}

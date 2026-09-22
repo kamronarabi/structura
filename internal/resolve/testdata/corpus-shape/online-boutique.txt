@@ -1,19 +1,20 @@
 online-boutique
   files       363 scanned, 90 parsed
-  nodes       38
+  nodes       37
   edges       43
-  connected   17 of 34 components
-  clusters    20
+  connected   17 of 33 components
+  clusters    19
+  redundant   14 of 37 nodes
 
   nodes by kind
     boundary                           4
     cloud_resource                     4
     datastore                          2
     external                           1
-    service                            27
+    service                            26
 
   nodes by layer
-    container                          33
+    container                          32
     context                            5
 
   edges by kind
@@ -29,8 +30,24 @@ online-boutique
     k8s_namespace_member               15
     terraform_reference                2
 
+  components drawn more than once
+    adservice                          2
+    cartservice                        2
+    checkoutservice                    2
+    currencyservice                    2
+    emailservice                       2
+    enable_google_apis                 2
+    frontend                           2
+    loadgenerator                      2
+    opentelemetrycollector             2
+    paymentservice                     2
+    productcatalogservice              2
+    recommendationservice              2
+    shippingservice                    2
+    shoppingassistantservice           2
+
   diagnostics
-    info code_joined_to_deployment     11
+    info code_joined_to_deployment     12
     info helm_values_inferred          1
     info k8s_patch_fragment            1
     info kustomize_unrendered          21

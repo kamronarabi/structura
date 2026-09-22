@@ -55,6 +55,9 @@ func Resolve(in Input) Result {
 		r.byID[r.nodes[i].ID] = &r.nodes[i]
 	}
 
+	r.mergeKindConflicts()
+	r.reindexSurvivors()
+
 	r.mergeDirectoryDuplicates()
 	r.reindexSurvivors()
 
@@ -252,8 +255,17 @@ func (r *resolver) reportCrossProjectJoins() {
 	}
 }
 
-// codeByDirectoryBase indexes source components by the last segment of their
-// directory, which is what a repository names after the service.
+// codeByDirectoryBase indexes source components by the names a deployment
+// might look them up under: the last segment of their directory, which is what
+// a repository usually names after the service, and every name the component
+// is otherwise known by.
+//
+// The directory alone is not enough, and the case that showed it is
+// src/cartservice/src. A directory named for its role names no component, so
+// the component is named after the directory above -- and indexing only the
+// last segment left it filed under "src", where the Deployment called
+// cartservice could never find it. The result was the service drawn twice,
+// once as a workload and once as the code it runs.
 //
 // Only components that carry a directory and no image are considered: those
 // are codebases. A deployment has an image and is the thing being merged
@@ -264,11 +276,26 @@ func (r *resolver) codeByDirectoryBase() map[string][]string {
 		if id.Directory == "" || len(id.Images) > 0 {
 			continue
 		}
-		base := strings.ToLower(path.Base(id.Directory))
-		if base == "" || base == "." || base == "/" {
-			continue
+		keys := map[string]bool{}
+		if base := strings.ToLower(path.Base(id.Directory)); base != "" && base != "." && base != "/" {
+			keys[base] = true
 		}
-		out[base] = append(out[base], id.NodeID)
+		for _, name := range id.Names {
+			if lower := strings.ToLower(strings.TrimSpace(name)); lower != "" {
+				keys[lower] = true
+			}
+		}
+
+		// Sorted so that the lists this builds are in a fixed order whatever
+		// the map handed back, which the uniqueness checks above depend on.
+		sorted := make([]string, 0, len(keys))
+		for key := range keys {
+			sorted = append(sorted, key)
+		}
+		sort.Strings(sorted)
+		for _, key := range sorted {
+			out[key] = append(out[key], id.NodeID)
+		}
 	}
 	return out
 }
