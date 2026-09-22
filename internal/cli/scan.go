@@ -115,17 +115,20 @@ func writeTo(path string, g schema.Graph) error {
 	if err != nil {
 		return err
 	}
-	return writeFile(path, data)
+	return graphio.WriteAtomic(path, data)
 }
 
 func summary(g schema.Graph, path string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s: %d nodes, %d edges", path, len(g.Nodes), len(g.Edges))
+	fmt.Fprintf(&b, "%s: %d %s, %d %s", path,
+		len(g.Nodes), plural(len(g.Nodes), "node", "nodes"),
+		len(g.Edges), plural(len(g.Edges), "edge", "edges"))
 	if n := len(g.Diagnostics); n > 0 {
 		fmt.Fprintf(&b, ", %d %s", n, plural(n, "diagnostic", "diagnostics"))
 	}
-	fmt.Fprintf(&b, " (%d files scanned, %d parsed, %dms)",
-		g.Stats.FilesScanned, g.Stats.FilesParsed, g.Stats.DurationMs)
+	fmt.Fprintf(&b, " (%d %s scanned, %d parsed, %dms)",
+		g.Stats.FilesScanned, plural(g.Stats.FilesScanned, "file", "files"),
+		g.Stats.FilesParsed, g.Stats.DurationMs)
 	return b.String()
 }
 

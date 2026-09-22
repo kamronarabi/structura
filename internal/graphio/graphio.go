@@ -33,38 +33,52 @@ func Path(root string) string {
 // scan is running.
 func Save(root string, g schema.Graph) (string, error) {
 	dest := Path(root)
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-		return "", fmt.Errorf("creating %s: %w", Dir, err)
-	}
-
 	data, err := schema.Marshal(g)
 	if err != nil {
 		return "", fmt.Errorf("serializing graph: %w", err)
 	}
+	if err := WriteAtomic(dest, data); err != nil {
+		return "", err
+	}
+	return dest, nil
+}
+
+// WriteAtomic installs data at dest through a temporary file in the same
+// directory, creating the directory if it does not exist.
+//
+// It is exported because `scan -o somewhere/else.json` writes the same
+// artifact to a different path, and it used to do so with a plain
+// os.WriteFile. That is the whole atomicity guarantee applying to one of the
+// two ways of asking for the same file: an interrupted scan left a truncated
+// graph if and only if the user had passed -o.
+func WriteAtomic(dest string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return fmt.Errorf("creating %s: %w", filepath.Dir(dest), err)
+	}
 
 	tmp, err := os.CreateTemp(filepath.Dir(dest), ".graph-*.json")
 	if err != nil {
-		return "", fmt.Errorf("creating temporary file: %w", err)
+		return fmt.Errorf("creating temporary file: %w", err)
 	}
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName) //nolint:errcheck // best effort on the failure path
 
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close() //nolint:errcheck // the write error is the real one
-		return "", fmt.Errorf("writing graph: %w", err)
+		return fmt.Errorf("writing graph: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		return "", fmt.Errorf("closing graph: %w", err)
+		return fmt.Errorf("closing graph: %w", err)
 	}
 	// 0644 rather than the 0600 CreateTemp gives us: graph.json is meant to
 	// be committed and read by other tools.
 	if err := os.Chmod(tmpName, 0o644); err != nil {
-		return "", fmt.Errorf("setting graph permissions: %w", err)
+		return fmt.Errorf("setting graph permissions: %w", err)
 	}
 	if err := os.Rename(tmpName, dest); err != nil {
-		return "", fmt.Errorf("installing graph: %w", err)
+		return fmt.Errorf("installing graph: %w", err)
 	}
-	return dest, nil
+	return nil
 }
 
 // Load reads a repository's graph.
