@@ -168,3 +168,89 @@ jobs:
         with:
           version: "~> v2"
           args: build --snapshot --clean
+
+  installer:
+    name: install.sh (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The two platforms the script claims to support. Its whole job is
+        # detecting which one it is on, so asserting that on one of them
+        # would test half of it.
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # A real release, built here: archives named by the same template the
+      # installer parses, and a real checksums.txt. Without this the script
+      # would be tested against a fixture that agrees with it by construction,
+      # and a change to name_template would break installs silently.
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --snapshot --clean --skip=publish,sign,sbom
+        env:
+          CGO_ENABLED: "0"
+
+      - name: serve it the way GitHub would
+        run: |
+          cd dist && nohup python3 -m http.server 8731 >/dev/null 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8731/checksums.txt >/dev/null && exit 0
+            sleep 0.5
+          done
+          echo "::error::the local release server never came up"; exit 1
+
+      - name: install it the way a user would
+        run: |
+          version=$(python3 -c "import json; print(json.load(open('dist/metadata.json'))['version'])")
+          STRUCTURA_BASE_URL=http://127.0.0.1:8731 \
+          STRUCTURA_VERSION="v$version" \
+          STRUCTURA_INSTALL_DIR="$HOME/structura-test/bin" \
+            sh install.sh
+          "$HOME/structura-test/bin/structura" version
+
+      - name: the installed binary actually scans
+        run: |
+          mkdir -p /tmp/demo
+          printf 'services:\n  web:\n    image: nginx\n    depends_on: [db]\n  db:\n    image: postgres:16\n' \
+            > /tmp/demo/docker-compose.yml
+          "$HOME/structura-test/bin/structura" scan -C /tmp/demo --print | tee /tmp/out.txt
+          grep -q 'datastore' /tmp/out.txt || {
+            echo "::error::the installed binary did not classify postgres as a datastore"; exit 1; }
+
+      # The checksum is the only thing standing between `curl | sh` and
+      # running whatever was served. If it ever stops being enforced, this
+      # fails rather than the users finding out.
+      - name: a tampered download must not install
+        run: |
+          version=$(python3 -c "import json; print(json.load(open('dist/metadata.json'))['version'])")
+          case "$(uname -s)" in
+            Darwin) os=darwin ;;
+            Linux)  os=linux ;;
+            *) echo "::error::unexpected runner OS"; exit 1 ;;
+          esac
+          case "$(uname -m)" in
+            x86_64|amd64)  arch=amd64 ;;
+            arm64|aarch64) arch=arm64 ;;
+            *) echo "::error::unexpected runner arch"; exit 1 ;;
+          esac
+          echo "not the binary you are looking for" \
+            > "dist/structura_${version}_${os}_${arch}.tar.gz"
+
+          if STRUCTURA_BASE_URL=http://127.0.0.1:8731 \
+             STRUCTURA_VERSION="v$version" \
+             STRUCTURA_INSTALL_DIR="$HOME/tamper-test/bin" \
+               sh install.sh; then
+            echo "::error::a tampered archive was installed"; exit 1
+          fi
+          if [ -e "$HOME/tamper-test/bin/structura" ]; then
+            echo "::error::a rejected install still left a binary behind"; exit 1
+          fi

@@ -59,9 +59,24 @@ make build          # → bin/structura
 
 ### From `v0.1.0` onward
 
-Signed, static binaries for macOS (Intel, Apple silicon, and a universal
-build), Linux (x86-64, arm64, armv7), and Windows (x86-64, arm64), published
-to GitHub Releases with checksums and an SBOM.
+One command, macOS and Linux, no package manager required:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kamronarabi/structura/main/install.sh | sh
+```
+
+It works out which build you need, checks the download against the published
+checksums before installing anything, and puts the binary in `/usr/local/bin`
+if that is writable or `~/.local/bin` if not. It never runs `sudo` on your
+behalf. To pin a version or choose the directory yourself:
+
+```sh
+STRUCTURA_VERSION=v0.1.0 STRUCTURA_INSTALL_DIR=~/bin   sh -c "$(curl -fsSL https://raw.githubusercontent.com/kamronarabi/structura/main/install.sh)"
+```
+
+If you would rather not pipe a script into a shell — a reasonable position —
+every release also publishes signed, static binaries with checksums and an
+SBOM:
 
 | Platform | |
 |---|---|
@@ -70,6 +85,9 @@ to GitHub Releases with checksums and an SBOM.
 | Fedora / RHEL | `.rpm` |
 | Alpine | `.apk` |
 | Anything else | `.tar.gz` — a single binary, nothing else to install |
+
+Builds exist for macOS (Intel, Apple silicon, and a universal binary), Linux
+(x86-64, arm64, armv7), and Windows (x86-64, arm64).
 
 There is nothing to configure, no daemon, and no runtime to install. The
 binary is built with cgo disabled, which on Linux means it is fully statically
