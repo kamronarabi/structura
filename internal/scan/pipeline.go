@@ -2,6 +2,8 @@ package scan
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -123,8 +125,9 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 	// identifiers, and therefore every stored graph, stay exactly as they
 	// were.
 	projects := project.Discover(opts.Projects)
+	var projectDiags []schema.Diagnostic
 	if projects.Len() > 1 {
-		qualifyByProject(outputs, projects)
+		projectDiags = qualifyByProject(outputs, projects)
 	}
 
 	// MERGE: fold the per-file buffers together, single-threaded and in the
@@ -133,6 +136,7 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 	merge := schema.NewBuilder()
 
 	diags := append([]schema.Diagnostic(nil), walkRes.Diagnostics...)
+	diags = append(diags, projectDiags...)
 
 	var (
 		hints   []resolve.Hint
@@ -370,11 +374,13 @@ func (c *collector) Diag(d schema.Diagnostic) { c.out.Diagnostics = append(c.out
 // The repository-root project is never qualified. A repository with one
 // project must produce byte-identical output to one scanned before this
 // existed.
-func qualifyByProject(outputs []FileOutput, projects *project.Set) {
+func qualifyByProject(outputs []FileOutput, projects *project.Set) []schema.Diagnostic {
+	labels, diags := projectLabels(outputs, projects)
+
 	for i := range outputs {
 		out := &outputs[i]
 		root := projects.Of(out.Path)
-		label := project.Label(root)
+		label := labels[root]
 		if label == "" {
 			continue
 		}
@@ -422,6 +428,115 @@ func qualifyByProject(outputs []FileOutput, projects *project.Set) {
 			out.Aliases[j].Project = root
 		}
 	}
+	return diags
+}
+
+// projectLabels chooses the label each project's namespaces are qualified
+// with, and it exists because QualifyNamespace cannot choose it safely.
+//
+// That function joins the label and the namespace with a hyphen and folds the
+// two together, and a hyphen is an ordinary character in both. So the project
+// "web-api" with a namespace "prod" and the project "web" with a namespace
+// "api-prod" produce one segment, and two projects merge into the one
+// boundary qualification exists to keep apart. QualifyNamespace is handed one
+// identifier at a time and has no way to notice; this pass holds every
+// project and every namespace in the repository at once, and can.
+//
+// So it checks, by folding each project's namespaces the same way
+// QualifyNamespace will and looking for two projects landing on one segment.
+// If none do -- which is the case for nearly every repository -- every
+// project keeps the readable label and every identifier is exactly what it
+// was before this function existed. If any do, every label gains a short
+// digest of its project root. The roots are distinct paths, so the digests
+// are distinct, and prefixing them separates projects whose names would
+// otherwise run together.
+func projectLabels(outputs []FileOutput, projects *project.Set) (map[string]string, []schema.Diagnostic) {
+	labels := map[string]string{}
+	for _, root := range projects.Roots() {
+		labels[root] = project.Label(root)
+	}
+
+	namespaces := projectNamespaces(outputs, projects)
+	if !foldsCollide(namespaces, labels) {
+		return labels, nil
+	}
+
+	for root := range labels {
+		if labels[root] == "" {
+			continue
+		}
+		labels[root] += "-" + rootDigest(root)
+	}
+
+	// Distinct roots give distinct digests, so this settles it. Saying so out
+	// loud rather than trusting it: a repository whose identifiers silently
+	// merged two projects is the failure this whole pass exists to prevent,
+	// and it should not be able to happen quietly a second time.
+	if foldsCollide(namespaces, labels) {
+		return labels, []schema.Diagnostic{{
+			Severity: schema.SeverityWarn,
+			Code:     "project_namespace_collision",
+			Message: "two projects in this repository produce the same qualified namespace even after disambiguation; " +
+				"their components may appear merged into one boundary",
+		}}
+	}
+	return labels, nil
+}
+
+// projectNamespaces reports which namespaces each project actually uses,
+// taken from the identifiers as extracted rather than from configuration:
+// only a namespace that reaches a node can collide with another.
+func projectNamespaces(outputs []FileOutput, projects *project.Set) map[string]map[string]bool {
+	out := map[string]map[string]bool{}
+	for i := range outputs {
+		root := projects.Of(outputs[i].Path)
+		for _, n := range outputs[i].Nodes {
+			parsed, err := schema.ParseNodeID(n.ID)
+			if err != nil {
+				continue
+			}
+			if out[root] == nil {
+				out[root] = map[string]bool{}
+			}
+			out[root][parsed.Namespace] = true
+		}
+	}
+	return out
+}
+
+// foldsCollide reports whether two different projects' namespaces fold to one
+// qualified segment under the given labels.
+//
+// The fold is performed by QualifyNamespace itself, on a throwaway identifier,
+// so this cannot drift from the rule it is checking.
+func foldsCollide(namespaces map[string]map[string]bool, labels map[string]string) bool {
+	owner := map[string]string{}
+	for root, set := range namespaces {
+		label := labels[root]
+		if label == "" {
+			continue
+		}
+		for ns := range set {
+			probe, err := schema.QualifyNamespace(
+				schema.NewNodeID(schema.KindBoundary, "probe", ns, "probe"), label)
+			if err != nil {
+				continue
+			}
+			if prev, seen := owner[probe]; seen && prev != root {
+				return true
+			}
+			owner[probe] = root
+		}
+	}
+	return false
+}
+
+// rootDigest is a short, stable identifier for a project root. It is only
+// ever used to separate two labels that would otherwise run together, so it
+// needs to be distinct and reproducible, not unguessable.
+func rootDigest(root string) string {
+	sum := sha256.Sum256([]byte(root))
+	return hex.EncodeToString(sum[:])[:6]
 }
 
 // undeclaredProjectDiagnostics reports trees that look like separate projects

@@ -90,17 +90,15 @@ func TestQualifyNamespaceRejectsMalformedIDs(t *testing.T) {
 	}
 }
 
-// A known limitation, pinned so that it is visible rather than remembered.
+// The hyphen join is ambiguous, and this pins that it is, because the fix
+// lives one level up.
 //
-// The prefix and the namespace are joined with a hyphen and folded together,
-// and a hyphen is an ordinary character in both, so the join is ambiguous.
-// Two different projects collapse into the one boundary this function exists
-// to keep apart.
-//
-// This asserts the collision rather than the fix, because the fix is not
-// available here: see QualifyNamespace's doc comment. When the caller learns
-// to disambiguate, this test should start failing, and that is the signal to
-// replace it with the property it was standing in for.
+// internal/scan's projectLabels detects two projects folding to one segment
+// and passes prefixes that cannot collide;
+// TestProjectsWhoseNamespacesWouldFoldTogetherStayApart is the end-to-end
+// assertion. This one holds the reason that pass has to exist. If it ever
+// starts failing, this function grew a defence of its own and the caller
+// should be re-examined rather than left doing work twice.
 func TestQualifyNamespaceCollision(t *testing.T) {
 	a, err := schema.QualifyNamespace(boundaryID(t, "prod", "ns"), "web-api")
 	if err != nil {

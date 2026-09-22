@@ -336,10 +336,16 @@ func validateRelPath(p string) error {
 // every qualified namespace, which would churn the IDs of every multi-project
 // repository to fix a case most of them do not have.
 //
-// The caller can fix it and this function cannot: qualifyByProject sees every
-// project at once, so it can detect two pairs folding to one segment and
-// disambiguate only those. Recorded here because the decision belongs with
-// whoever owns that pass.
+// The caller fixes it, because the caller can. internal/scan's projectLabels
+// holds every project and every namespace in the repository at once, folds
+// them the same way this function will, and if two projects land on one
+// segment it gives every label a digest of its project root before calling
+// here. Repositories with no collision keep the readable label, so this stays
+// the common path and the identifiers it produces are unchanged.
+//
+// What that leaves here is a function that is unsafe to call with an
+// arbitrary prefix and safe with the one it is given. Said plainly because
+// the next caller will not have the first one's global view.
 func QualifyNamespace(id, prefix string) (string, error) {
 	if prefix == "" {
 		return id, nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -348,4 +349,120 @@ func TestIdenticallyNamedStacksAreNotDetected(t *testing.T) {
 				"update the comment on sharesRealComponent: %s", d.Message)
 		}
 	}
+}
+
+// collidingStacks writes two projects whose names and namespaces run together
+// under the hyphen join that qualification uses: "web-api" with a namespace
+// "prod", and "web" with a namespace "api-prod". Both fold to "web-api-prod".
+func collidingStacks(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for _, s := range []struct{ dir, namespace string }{
+		{"web-api", "prod"},
+		{"web", "api-prod"},
+	} {
+		dir := filepath.Join(root, s.dir)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		manifest := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: ` + s.namespace + `
+spec:
+  selector:
+    matchLabels: {app: api}
+  template:
+    metadata:
+      labels: {app: api}
+    spec:
+      containers:
+        - name: main
+          image: ` + s.dir + `/api:1.0
+`
+		if err := os.WriteFile(filepath.Join(dir, "app.yaml"), []byte(manifest), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
+}
+
+// Qualification prefixes a namespace with its project so that two projects
+// each declaring "prod" stay apart. It joins them with a hyphen, and a hyphen
+// is an ordinary character in a project name and in a namespace, so the join
+// is ambiguous: ("web-api", "prod") and ("web", "api-prod") produce one
+// segment. Two projects merged back into the one boundary the prefix exists
+// to separate -- the original bug, wearing a different hat.
+func TestProjectsWhoseNamespacesWouldFoldTogetherStayApart(t *testing.T) {
+	root := collidingStacks(t)
+	g := runProjects(t, root, []string{"web-api", "web"})
+
+	var services []schema.Node
+	for _, n := range g.Nodes {
+		if n.Kind == schema.KindService {
+			services = append(services, n)
+		}
+	}
+	if len(services) != 2 {
+		var got []string
+		for _, n := range services {
+			got = append(got, n.ID)
+		}
+		t.Fatalf("got %d services %v, want 2: the two projects' deployments merged into one node", len(services), got)
+	}
+
+	if services[0].ID == services[1].ID {
+		t.Fatalf("both services have the id %q", services[0].ID)
+	}
+	seen := map[string]bool{}
+	for _, n := range services {
+		seen[projectOf(n)] = true
+	}
+	if len(seen) != 2 {
+		t.Errorf("the two services belong to projects %v, want one each", seen)
+	}
+
+	// Every identifier still has to be one the rest of the system accepts.
+	for _, n := range g.Nodes {
+		if err := schema.ValidateNodeID(n.ID); err != nil {
+			t.Errorf("disambiguation produced an invalid id: %v", err)
+		}
+	}
+}
+
+// The disambiguation is conditional, and that is the point: a repository
+// whose projects do not collide must keep the readable identifiers it
+// already has, with no digest appended to anything.
+func TestNonCollidingProjectsKeepReadableIdentifiers(t *testing.T) {
+	root := twoDistinctStacks(t)
+	g := runProjects(t, root, []string{"shop", "billing"})
+
+	for _, n := range g.Nodes {
+		parsed, err := schema.ParseNodeID(n.ID)
+		if err != nil {
+			t.Fatalf("ParseNodeID(%q) = %v", n.ID, err)
+		}
+		for _, project := range []string{"shop", "billing"} {
+			if !strings.HasPrefix(parsed.Namespace, project+"-") {
+				continue
+			}
+			// "shop-prod" is what it should read. "shop-1a2b3c-prod" means a
+			// collision was declared where there is none.
+			rest := strings.TrimPrefix(parsed.Namespace, project+"-")
+			if hexish(strings.SplitN(rest, "-", 2)[0]) {
+				t.Errorf("namespace %q carries a digest, but these projects do not collide", parsed.Namespace)
+			}
+		}
+	}
+}
+
+// hexish reports whether s looks like the six-character digest the collision
+// path appends.
+func hexish(s string) bool {
+	if len(s) != 6 {
+		return false
+	}
+	_, err := strconv.ParseUint(s, 16, 64)
+	return err == nil
 }
