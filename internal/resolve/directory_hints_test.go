@@ -24,10 +24,10 @@ func envHint(dir, raw string, tokens []string, edge schema.EdgeKind) resolve.Hin
 
 func TestDirectoryHintBindsToTheServiceInThatDirectory(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindService, "manifest", "typescript", "storefront", schema.Attrs{
+	b.node(schema.KindService, "", "storefront", schema.Attrs{
 		"directory": "services/web",
 	})
-	b.node(schema.KindDatastore, "compose", "default", "orders-db", nil)
+	b.node(schema.KindDatastore, "default", "orders-db", nil)
 	b.hint(envHint("services/web", "postgres://orders-db:5432/app",
 		[]string{"orders-db"}, schema.EdgePersistsTo))
 
@@ -44,7 +44,7 @@ func TestDirectoryHintBindsToTheServiceInThatDirectory(t *testing.T) {
 // what the extractor has to emit for a root .env file.
 func TestDirectoryHintBindsAtRepositoryRoot(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindService, "manifest", "typescript", "storefront", schema.Attrs{
+	b.node(schema.KindService, "", "storefront", schema.Attrs{
 		"directory": ".",
 	})
 	b.hint(envHint(".", "https://abcxyz.supabase.co",
@@ -62,10 +62,10 @@ func TestDirectoryHintBindsAtRepositoryRoot(t *testing.T) {
 // that directory, which is a different attribute than a manifest's.
 func TestDirectoryHintBindsThroughBuildContext(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindService, "compose", "shop", "api", schema.Attrs{
+	b.node(schema.KindService, "shop", "api", schema.Attrs{
 		"buildContext": "./services/api",
 	})
-	b.node(schema.KindDatastore, "compose", "shop", "cache", nil)
+	b.node(schema.KindDatastore, "shop", "cache", nil)
 	b.hint(envHint("services/api", "redis://cache:6379", []string{"cache"}, schema.EdgePersistsTo))
 
 	r := b.run()
@@ -78,10 +78,10 @@ func TestDirectoryHintBindsThroughBuildContext(t *testing.T) {
 // attaching them, so an unowned directory is reported and drawn as nothing.
 func TestUnownedDirectoryIsReportedNotGuessed(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindService, "manifest", "typescript", "storefront", schema.Attrs{
+	b.node(schema.KindService, "", "storefront", schema.Attrs{
 		"directory": "services/web",
 	})
-	b.node(schema.KindDatastore, "compose", "default", "orders-db", nil)
+	b.node(schema.KindDatastore, "default", "orders-db", nil)
 	b.hint(envHint("infra", "postgres://orders-db:5432/app",
 		[]string{"orders-db"}, schema.EdgePersistsTo))
 
@@ -96,9 +96,9 @@ func TestUnownedDirectoryIsReportedNotGuessed(t *testing.T) {
 
 func TestAmbiguousOwnerIsReportedNotGuessed(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindService, "manifest", "typescript", "web", schema.Attrs{"directory": "app"})
-	b.node(schema.KindService, "manifest", "python", "worker", schema.Attrs{"directory": "app"})
-	b.node(schema.KindDatastore, "compose", "default", "orders-db", nil)
+	b.node(schema.KindService, "", "web", schema.Attrs{"directory": "app"})
+	b.node(schema.KindService, "", "worker", schema.Attrs{"directory": "app"})
+	b.node(schema.KindDatastore, "default", "orders-db", nil)
 	b.hint(envHint("app", "postgres://orders-db:5432/app",
 		[]string{"orders-db"}, schema.EdgePersistsTo))
 
@@ -115,7 +115,7 @@ func TestAmbiguousOwnerIsReportedNotGuessed(t *testing.T) {
 // service that happens to live beside it.
 func TestDatastoreIsNotAnOwner(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindDatastore, "compose", "default", "db", schema.Attrs{"directory": "data"})
+	b.node(schema.KindDatastore, "default", "db", schema.Attrs{"directory": "data"})
 	b.hint(envHint("data", "redis://cache:6379", []string{"cache"}, schema.EdgePersistsTo))
 
 	r := b.run()
@@ -130,7 +130,7 @@ func TestDatastoreIsNotAnOwner(t *testing.T) {
 // Several variables from one unowned file are one problem, not one each.
 func TestUnownedFileReportedOncePerFile(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindService, "manifest", "go", "api", schema.Attrs{"directory": "api"})
+	b.node(schema.KindService, "", "api", schema.Attrs{"directory": "api"})
 	for _, token := range []string{"a", "b", "c"} {
 		b.hint(envHint("nowhere", "redis://"+token+":6379", []string{token}, schema.EdgePersistsTo))
 	}
@@ -151,14 +151,14 @@ func TestUnownedFileReportedOncePerFile(t *testing.T) {
 // hint from the codebase's directory has to land on the surviving node.
 func TestDirectoryHintFollowsCodeMergedIntoDeployment(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindService, "compose", "shop", "api", schema.Attrs{
+	b.node(schema.KindService, "shop", "api", schema.Attrs{
 		"buildContext": "services/api",
 		"image":        "acme/api:1",
 	})
-	b.node(schema.KindService, "manifest", "go", "acme/api", schema.Attrs{
+	b.node(schema.KindService, "", "acme/api", schema.Attrs{
 		"directory": "services/api",
 	})
-	b.node(schema.KindDatastore, "compose", "shop", "cache", nil)
+	b.node(schema.KindDatastore, "shop", "cache", nil)
 	b.hint(envHint("services/api", "redis://cache:6379", []string{"cache"}, schema.EdgePersistsTo))
 
 	r := b.run()
@@ -177,8 +177,8 @@ func TestDirectoryHintFollowsCodeMergedIntoDeployment(t *testing.T) {
 // A hint that names its own source node is untouched by any of this.
 func TestHintWithExplicitSourceIsUnaffected(t *testing.T) {
 	b := &builder{}
-	from := b.node(schema.KindService, "k8s", "prod", "api", nil)
-	b.node(schema.KindDatastore, "k8s", "prod", "cache", nil)
+	from := b.node(schema.KindService, "prod", "api", nil)
+	b.node(schema.KindDatastore, "prod", "cache", nil)
 	b.hint(resolve.Hint{
 		FromNode: from, Kind: resolve.HintConnString,
 		Raw: "redis://cache:6379", Tokens: []string{"cache"},

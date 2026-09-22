@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://structura.dev/schema/sag-v0.3.0.json",
+  "$id": "https://structura.dev/schema/sag-v1.0.0.json",
   "$defs": {
     "Attrs": {
       "type": "object"
@@ -153,6 +153,9 @@
           "type": "string"
         },
         "namespace": {
+          "type": "string"
+        },
+        "project": {
           "type": "string"
         },
         "tech": {
@@ -336,5 +339,5 @@
     "stats"
   ],
   "title": "Structura Architecture Graph",
-  "description": "Graph schema version 0.3.0. Versioned independently of the structura CLI."
+  "description": "Graph schema version 1.0.0. Versioned independently of the structura CLI."
 }

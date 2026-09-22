@@ -12,12 +12,52 @@ import (
 
 // Node IDs have the form:
 //
-//	<kind>:<source>/<namespace>/<name>
+//	<layer>:<name>
+//	<layer>:@<scope>/<name>
 //
-// where kind, source, and namespace contain no slash and name may. The ID is
-// semantic rather than a content hash so that moving a file does not rename
-// every node — which would make each drift diff look like an architecture
-// change — and so that IDs stay readable when a model quotes them back.
+// A node is identified by what it is called and where it lives. Nothing about
+// which file described it, and nothing inferred about what it is.
+//
+// # What is not in here, and why
+//
+// The identifier used to carry the extractor that found the node and the kind
+// it was taken to be. Both are properties of the reading, not of the
+// component, and both split one component into several.
+//
+// A kind is inferred from an image. docker-compose.yml gave carts-db an image
+// of mongo and it became a datastore; docker-compose.logging.yml mentioned the
+// same service to attach a log driver, named no image, and got the service
+// fallback. One database, two identifiers. Only the layer survives into the
+// identifier, because the layer is the part that does not move: both of those
+// readings are container level. See LayerOf.
+//
+// An extractor is worse. A Helm chart and a cluster manifest describing one
+// service produced different identifiers by construction, and no later rule
+// can join what the grammar has already separated. Two fifths of
+// online-boutique's nodes were another node again.
+//
+// # Scope
+//
+// Scope is the deployment scope a component lives in: a Kubernetes namespace,
+// optionally prefixed with the project when a repository declares more than
+// one. A chart name, a Compose project, a Terraform module directory and a
+// language are not scopes, and the field that once held all five now holds
+// only this one. What the others knew is recorded where it belongs -- the
+// language in Tech, the packaging in an attribute, the grouping in a boundary
+// node's contains edge.
+//
+// Most nodes have no scope, so most identifiers are a layer and a name. The
+// "@" marks a scope when there is one, and it is required rather than
+// decorative: a name may contain slashes, so without a marker
+// "container:acme/api" could be the module acme/api or the service api in
+// namespace acme. "@" cannot occur in a folded name -- it is not in the
+// allowed set, so it folds to a hyphen and a leading hyphen is trimmed --
+// which is what makes it unambiguous.
+//
+// The ID is semantic rather than a content hash so that moving a file does not
+// rename every node — which would make each drift diff look like an
+// architecture change — and so that IDs stay readable when a model quotes them
+// back.
 //
 // Every segment is normalized: lowercased, with anything outside
 // [a-z0-9._-] folded to a hyphen. Name preserves slashes so that package
@@ -67,7 +107,12 @@ import (
 // form, case included, as a loss worth a discriminator. The readable spelling
 // stays in Node.Name, which is what every tool prints.
 
-const idSeparator = ":"
+const (
+	idSeparator = ":"
+	// scopeMarker introduces the scope segment. See the grammar note above
+	// for why a marker is needed rather than position alone.
+	scopeMarker = "@"
+)
 
 // idDiscriminatorLen is how much of the hash is kept. Thirty-two bits is far
 // more than the handful of folded names in a repository needs, and short
@@ -77,16 +122,20 @@ const idDiscriminatorLen = 8
 // ErrInvalidNodeID is returned for a string that is not a well-formed node ID.
 var ErrInvalidNodeID = errors.New("invalid node id")
 
-// NewNodeID builds a node ID from its parts. Empty source or namespace are
-// replaced with "unknown" and "default" respectively so that the shape stays
-// fixed and parseable.
-func NewNodeID(kind NodeKind, source, namespace, name string) string {
+// NewNodeID builds a node ID from a component's identity: the layer its kind
+// belongs to, the deployment scope it lives in, and its name. Scope is empty
+// for the many components that have none.
+//
+// The kind is taken rather than the layer so that a node's identifier and its
+// Layer field cannot disagree: both come from LayerOf.
+func NewNodeID(kind NodeKind, scope, name string) string {
 	// Joined by hand rather than with path.Join, which would Clean the
 	// result and silently collapse a segment that normalized to "." or "..".
-	return string(kind) + idSeparator +
-		slugSegment(orDefault(source, "unknown")) + "/" +
-		slugSegment(orDefault(namespace, "default")) + "/" +
-		qualify(slugPath(name), name, false)
+	id := string(LayerOf(kind)) + idSeparator
+	if trimmed := strings.TrimSpace(scope); trimmed != "" {
+		id += scopeMarker + slugSegment(trimmed) + "/"
+	}
+	return id + qualify(slugPath(name), name, false)
 }
 
 // NewSymbolID builds the ID of a code symbol: a function, an HTTP endpoint, a
@@ -96,7 +145,7 @@ func NewNodeID(kind NodeKind, source, namespace, name string) string {
 // Case is preserved through the discriminator rather than in the ID itself,
 // because allowing uppercase would change the ID grammar, and the grammar is
 // a major-version promise.
-func NewSymbolID(kind NodeKind, source, namespace, file, symbol string) string {
+func NewSymbolID(kind NodeKind, scope, file, symbol string) string {
 	name := strings.TrimSpace(file)
 	if sym := strings.TrimSpace(symbol); sym != "" {
 		if name != "" {
@@ -104,7 +153,7 @@ func NewSymbolID(kind NodeKind, source, namespace, file, symbol string) string {
 		}
 		name += sym
 	}
-	return NewNodeID(kind, source, namespace, qualify(slugPath(name), name, true))
+	return NewNodeID(kind, scope, qualify(slugPath(name), name, true))
 }
 
 // qualify appends a discriminator when folding destroyed what told two inputs
@@ -158,34 +207,43 @@ func discriminator(s string) string {
 
 // ParsedNodeID is the decomposition of a node ID.
 type ParsedNodeID struct {
-	Kind      NodeKind
-	Source    string
-	Namespace string
-	Name      string
+	Layer Layer
+	// Scope is the deployment scope, empty when the node has none.
+	Scope string
+	Name  string
 }
 
 // ParseNodeID splits an ID back into its parts.
+//
+// Resolution does not go through here. A node's identity is read from its
+// fields, which is what lets the identifier be chosen for readability; this
+// exists for validation and for the few places that have an identifier and no
+// node.
 func ParseNodeID(id string) (ParsedNodeID, error) {
-	kindStr, rest, ok := strings.Cut(id, idSeparator)
+	layerStr, rest, ok := strings.Cut(id, idSeparator)
 	if !ok {
-		return ParsedNodeID{}, fmt.Errorf("%w: %q has no kind prefix", ErrInvalidNodeID, id)
+		return ParsedNodeID{}, fmt.Errorf("%w: %q has no layer prefix", ErrInvalidNodeID, id)
 	}
-	kind := NodeKind(kindStr)
-	if !kind.Valid() {
-		return ParsedNodeID{}, fmt.Errorf("%w: %q has unknown kind %q", ErrInvalidNodeID, id, kindStr)
+	layer := Layer(layerStr)
+	if !layer.Valid() {
+		return ParsedNodeID{}, fmt.Errorf("%w: %q has unknown layer %q", ErrInvalidNodeID, id, layerStr)
 	}
-	// SplitN with 3 keeps any slashes in the name segment.
-	parts := strings.SplitN(rest, "/", 3)
-	if len(parts) != 3 {
-		return ParsedNodeID{}, fmt.Errorf(
-			"%w: %q wants <kind>:<source>/<namespace>/<name>", ErrInvalidNodeID, id)
-	}
-	for i, p := range parts {
-		if p == "" {
-			return ParsedNodeID{}, fmt.Errorf("%w: %q has an empty segment %d", ErrInvalidNodeID, id, i)
+
+	out := ParsedNodeID{Layer: layer}
+	if scoped, found := strings.CutPrefix(rest, scopeMarker); found {
+		scope, name, ok := strings.Cut(scoped, "/")
+		if !ok {
+			return ParsedNodeID{}, fmt.Errorf(
+				"%w: %q has a scope marker and no name", ErrInvalidNodeID, id)
 		}
+		out.Scope, out.Name = scope, name
+	} else {
+		out.Name = rest
 	}
-	return ParsedNodeID{Kind: kind, Source: parts[0], Namespace: parts[1], Name: parts[2]}, nil
+	if out.Name == "" || (strings.HasPrefix(rest, scopeMarker) && out.Scope == "") {
+		return ParsedNodeID{}, fmt.Errorf("%w: %q has an empty segment", ErrInvalidNodeID, id)
+	}
+	return out, nil
 }
 
 // ValidateNodeID reports whether id is well-formed and already normalized.
@@ -199,11 +257,24 @@ func ValidateNodeID(id string) error {
 	}
 	// An ID that is not already normalized would compare unequal to the ID
 	// the constructor produces for the same node, silently splitting it in
-	// two during merge.
-	if got := NewNodeID(p.Kind, p.Source, p.Namespace, p.Name); got != id {
+	// two during merge. Rebuilt through a kind so that the layer is checked
+	// to be one a kind can actually produce.
+	if got := rebuild(p); got != id {
 		return fmt.Errorf("%w: %q is not normalized (want %q)", ErrInvalidNodeID, id, got)
 	}
 	return nil
+}
+
+// rebuild reconstructs an identifier from its parsed parts, which is how
+// normalization is checked. The layer is carried through directly rather than
+// via a kind, because several kinds map onto one layer and any of them would
+// do.
+func rebuild(p ParsedNodeID) string {
+	id := string(p.Layer) + idSeparator
+	if p.Scope != "" {
+		id += scopeMarker + slugSegment(p.Scope) + "/"
+	}
+	return id + qualify(slugPath(p.Name), p.Name, false)
 }
 
 // NewEdgeID derives a stable, short identifier from the edge's endpoints.
@@ -277,13 +348,6 @@ func foldInvalid(s string, allowSlash bool) string {
 	return strings.Trim(b.String(), "-.")
 }
 
-func orDefault(s, def string) string {
-	if strings.TrimSpace(s) == "" {
-		return def
-	}
-	return s
-}
-
 // validateRelPath enforces the repo-relative, slash-separated path invariant.
 // An empty path is allowed: many diagnostics are not file-scoped.
 func validateRelPath(p string) error {
@@ -304,28 +368,29 @@ func validateRelPath(p string) error {
 	return nil
 }
 
-// QualifyNamespace prefixes a node ID's namespace segment, returning the new
-// ID with every other segment preserved exactly.
+// QualifyProject prefixes a node ID's scope with the project it belongs to,
+// returning the new ID with the name preserved exactly.
 //
 // This is how a repository that holds more than one project keeps their
 // components apart. Two independent stacks each declaring a "prod" namespace
 // produce the same ID for different things, and the graph merges them into
 // one node that claims to contain both: a boundary that really does exist
-// twice, drawn once, with members from two systems inside it. Prefixing the
-// namespace with the project is enough to separate them, and it leaves the ID
-// grammar alone -- the shape is unchanged, only the value differs, so a
-// reader built for any schema version still parses it.
+// twice, drawn once, with members from two systems inside it.
 //
-// The name segment is copied verbatim rather than rebuilt, because rebuilding
-// would fold an already-folded name a second time and could append a second
+// A node with no scope gains one, which is the project alone. That is correct
+// and is the point: in a repository of several projects, "where it lives" is
+// at least which project, even when nothing narrower is known.
+//
+// The name is copied verbatim rather than rebuilt, because rebuilding would
+// fold an already-folded name a second time and could append a second
 // discriminator to a name that already carries one.
 //
 // # A collision this does not resolve
 //
-// The prefix and the namespace are joined with a hyphen and folded together,
-// and a hyphen is an ordinary character in both. So ("web-api", "prod") and
+// The project and the scope are joined with a hyphen and folded together, and
+// a hyphen is an ordinary character in both. So ("web-api", "prod") and
 // ("web", "api-prod") produce the same segment, and two projects merge into
-// the one boundary this exists to keep apart. TestQualifyNamespaceCollision
+// the one boundary this exists to keep apart. TestQualifyProjectCollision
 // holds the case.
 //
 // It is not fixable here. A separator that folding cannot produce would have
@@ -333,41 +398,42 @@ func validateRelPath(p string) error {
 // re-normalization -- and folding collapses a run of hyphens, so "--" does
 // not survive. Underscore does survive, and therefore can appear in a project
 // name, so it collides in the same way. What is left is a discriminator on
-// every qualified namespace, which would churn the IDs of every multi-project
+// every qualified scope, which would churn the IDs of every multi-project
 // repository to fix a case most of them do not have.
 //
 // The caller fixes it, because the caller can. internal/scan's projectLabels
-// holds every project and every namespace in the repository at once, folds
-// them the same way this function will, and if two projects land on one
-// segment it gives every label a digest of its project root before calling
-// here. Repositories with no collision keep the readable label, so this stays
-// the common path and the identifiers it produces are unchanged.
+// holds every project and every scope in the repository at once, folds them
+// the same way this function will, and if two projects land on one segment it
+// gives every label a digest of its project root before calling here.
+// Repositories with no collision keep the readable label, so this stays the
+// common path and the identifiers it produces are unchanged.
 //
 // What that leaves here is a function that is unsafe to call with an
 // arbitrary prefix and safe with the one it is given. Said plainly because
 // the next caller will not have the first one's global view.
-func QualifyNamespace(id, prefix string) (string, error) {
-	if prefix == "" {
+func QualifyProject(id, project string) (string, error) {
+	if project == "" {
 		return id, nil
 	}
-	colon := strings.Index(id, idSeparator)
-	if colon <= 0 {
-		return "", fmt.Errorf("%w: %q has no kind", ErrInvalidNodeID, id)
-	}
-	kind, rest := id[:colon], id[colon+1:]
-
-	source, rest, ok := strings.Cut(rest, "/")
-	if !ok {
-		return "", fmt.Errorf("%w: %q has no namespace", ErrInvalidNodeID, id)
-	}
-	namespace, name, ok := strings.Cut(rest, "/")
-	if !ok {
-		return "", fmt.Errorf("%w: %q has no name", ErrInvalidNodeID, id)
-	}
-	if namespace == "" || name == "" {
-		return "", fmt.Errorf("%w: %q has an empty segment", ErrInvalidNodeID, id)
+	layer, rest, ok := strings.Cut(id, idSeparator)
+	if !ok || layer == "" {
+		return "", fmt.Errorf("%w: %q has no layer", ErrInvalidNodeID, id)
 	}
 
-	return kind + idSeparator + source + "/" +
-		slugSegment(prefix+"-"+namespace) + "/" + name, nil
+	scope, name := "", rest
+	if scoped, found := strings.CutPrefix(rest, scopeMarker); found {
+		scope, name, ok = strings.Cut(scoped, "/")
+		if !ok || scope == "" {
+			return "", fmt.Errorf("%w: %q has no name after its scope", ErrInvalidNodeID, id)
+		}
+	}
+	if name == "" {
+		return "", fmt.Errorf("%w: %q has an empty name", ErrInvalidNodeID, id)
+	}
+
+	qualified := project
+	if scope != "" {
+		qualified = project + "-" + scope
+	}
+	return layer + idSeparator + scopeMarker + slugSegment(qualified) + "/" + name, nil
 }

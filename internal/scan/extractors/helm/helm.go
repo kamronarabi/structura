@@ -92,7 +92,7 @@ func (e *Extractor) extractChart(f *scan.File, emit scan.Emitter) error {
 	line := pos.Line("name")
 	src := schema.Source{Extractor: Name, Path: f.Path, Line: line}
 
-	boundaryID := schema.NewNodeID(schema.KindBoundary, Name, chart.Name, chart.Name)
+	boundaryID := schema.NewNodeID(schema.KindBoundary, chart.Name, chart.Name)
 	attrs := schema.Attrs{"chartVersion": chart.Version, "packaging": "helm"}
 	if chart.AppVersion != "" {
 		attrs["appVersion"] = chart.AppVersion
@@ -116,7 +116,7 @@ func (e *Extractor) extractChart(f *scan.File, emit scan.Emitter) error {
 		// postgresql subchart deploys Postgres — which is the same signal an
 		// image reference carries.
 		kind, tech, _ := classify.ImageKind(dep.Name)
-		depID := schema.NewNodeID(kind, Name, chart.Name, name)
+		depID := schema.NewNodeID(kind, chart.Name, name)
 
 		depAttrs := schema.Attrs{"chart": dep.Name, "packaging": "helm-subchart"}
 		if dep.Version != "" {
@@ -204,7 +204,7 @@ func (e *Extractor) extractValues(f *scan.File, emit scan.Emitter) error {
 
 	image := chartImage(values)
 	kind, tech, _ := classify.ImageKind(image)
-	id := schema.NewNodeID(kind, Name, chartName, chartName)
+	id := schema.NewNodeID(kind, chartName, chartName)
 
 	attrs := schema.Attrs{"packaging": "helm"}
 	if image != "" {
@@ -475,7 +475,7 @@ func (e *Extractor) emitUmbrella(f *scan.File, emit scan.Emitter, chartName stri
 		if !ok {
 			kind, tech, _ = classify.ImageKind(w.name)
 		}
-		id := schema.NewNodeID(kind, Name, chartName, w.name)
+		id := schema.NewNodeID(kind, chartName, w.name)
 		ids[w.block] = id
 
 		attrs := schema.Attrs{"packaging": "helm", "valuesKey": w.block}

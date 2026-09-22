@@ -19,10 +19,10 @@ type contribution struct {
 }
 
 func sampleContributions() []contribution {
-	api := schema.NewNodeID(schema.KindService, "k8s", "prod", "api-gateway")
-	db := schema.NewNodeID(schema.KindDatastore, "k8s", "prod", "postgres")
-	cache := schema.NewNodeID(schema.KindDatastore, "compose", "default", "redis")
-	stripe := schema.NewNodeID(schema.KindExternal, "resolver", "net", "api.stripe.com")
+	api := schema.NewNodeID(schema.KindService, "prod", "api-gateway")
+	db := schema.NewNodeID(schema.KindDatastore, "prod", "postgres")
+	cache := schema.NewNodeID(schema.KindDatastore, "default", "redis")
+	stripe := schema.NewNodeID(schema.KindExternal, "net", "api.stripe.com")
 
 	return []contribution{
 		{
@@ -262,11 +262,11 @@ func TestMergeKeepsTheMoreConfidentReading(t *testing.T) {
 func TestBuildRejectsDanglingEdge(t *testing.T) {
 	b := schema.NewBuilder()
 	b.AddNode(schema.Node{
-		ID: "service:k8s/prod/api", Kind: schema.KindService, Layer: schema.LayerContainer,
+		ID: "container:@prod/api", Kind: schema.KindService, Layer: schema.LayerContainer,
 		Name: "api", Confidence: 1,
 	})
 	b.AddEdge(schema.Edge{
-		From: "service:k8s/prod/api", To: "datastore:k8s/prod/ghost",
+		From: "container:@prod/api", To: "container:@prod/ghost",
 		Kind: schema.EdgePersistsTo, Confidence: 0.8,
 		Evidence: []schema.Evidence{{Extractor: "resolver", Rule: "env_host_match"}},
 	})
@@ -282,7 +282,7 @@ func TestBuildRejectsDanglingEdge(t *testing.T) {
 
 func TestBuildRejectsEdgeWithoutEvidence(t *testing.T) {
 	b := schema.NewBuilder()
-	for _, id := range []string{"service:k8s/prod/api", "datastore:k8s/prod/db"} {
+	for _, id := range []string{"container:@prod/api", "container:@prod/db"} {
 		kind := schema.KindService
 		if strings.HasPrefix(id, "datastore") {
 			kind = schema.KindDatastore
@@ -290,7 +290,7 @@ func TestBuildRejectsEdgeWithoutEvidence(t *testing.T) {
 		b.AddNode(schema.Node{ID: id, Kind: kind, Layer: schema.LayerContainer, Name: "x", Confidence: 1})
 	}
 	b.AddEdge(schema.Edge{
-		From: "service:k8s/prod/api", To: "datastore:k8s/prod/db",
+		From: "container:@prod/api", To: "container:@prod/db",
 		Kind: schema.EdgePersistsTo, Confidence: 0.8,
 	})
 
@@ -304,7 +304,7 @@ func TestBuildRejectsEdgeWithoutEvidence(t *testing.T) {
 func TestBuildRejectsAbsolutePaths(t *testing.T) {
 	b := schema.NewBuilder()
 	b.AddNode(schema.Node{
-		ID: "service:k8s/prod/api", Kind: schema.KindService, Layer: schema.LayerContainer,
+		ID: "container:@prod/api", Kind: schema.KindService, Layer: schema.LayerContainer,
 		Name: "api", Confidence: 1,
 		Sources: []schema.Source{{Extractor: "k8s", Path: "/Users/someone/repo/deploy/api.yaml"}},
 	})
@@ -319,7 +319,7 @@ func TestBuildRejectsAbsolutePaths(t *testing.T) {
 func TestBuildRejectsWindowsSeparators(t *testing.T) {
 	b := schema.NewBuilder()
 	b.AddNode(schema.Node{
-		ID: "service:k8s/prod/api", Kind: schema.KindService, Layer: schema.LayerContainer,
+		ID: "container:@prod/api", Kind: schema.KindService, Layer: schema.LayerContainer,
 		Name: "api", Confidence: 1,
 		Sources: []schema.Source{{Extractor: "k8s", Path: `deploy\prod\api.yaml`}},
 	})
@@ -329,7 +329,7 @@ func TestBuildRejectsWindowsSeparators(t *testing.T) {
 }
 
 func TestNodeKindConflictIsReported(t *testing.T) {
-	id := schema.NewNodeID(schema.KindService, "k8s", "prod", "redis")
+	id := schema.NewNodeID(schema.KindService, "prod", "redis")
 	b := schema.NewBuilder()
 	b.AddNode(schema.Node{ID: id, Kind: schema.KindService, Layer: schema.LayerContainer, Name: "redis", Confidence: 1})
 	b.AddNode(schema.Node{ID: id, Kind: schema.KindDatastore, Layer: schema.LayerContainer, Name: "redis", Confidence: 1})
@@ -352,7 +352,7 @@ func TestNodeKindConflictIsReported(t *testing.T) {
 func TestConfidenceIsRoundedAndClamped(t *testing.T) {
 	b := schema.NewBuilder()
 	b.AddNode(schema.Node{
-		ID: "service:k8s/prod/api", Kind: schema.KindService, Layer: schema.LayerContainer,
+		ID: "container:@prod/api", Kind: schema.KindService, Layer: schema.LayerContainer,
 		Name: "api", Confidence: 0.7000000000000001,
 	})
 	g, err := b.Build(schema.Root{Name: "x"}, schema.Stats{})
@@ -391,7 +391,7 @@ func TestEmptyGraphSerializesAsEmptyArrays(t *testing.T) {
 func TestMarshalDoesNotEscapeHTML(t *testing.T) {
 	b := schema.NewBuilder()
 	b.AddNode(schema.Node{
-		ID: "external:resolver/net/example.com", Kind: schema.KindExternal, Layer: schema.LayerContext,
+		ID: "context:example.com", Kind: schema.KindExternal, Layer: schema.LayerContext,
 		Name: "example.com", Confidence: 0.8,
 		Attrs: schema.Attrs{"url": "https://example.com/?a=1&b=2"},
 	})
@@ -420,17 +420,17 @@ func TestMarshalDoesNotEscapeHTML(t *testing.T) {
 func TestMeasureSeparatesASystemFromACollection(t *testing.T) {
 	system := schema.Graph{
 		Nodes: []schema.Node{
-			{ID: "boundary:k8s/prod/prod", Kind: schema.KindBoundary},
-			{ID: "service:k8s/prod/api", Kind: schema.KindService},
-			{ID: "service:k8s/prod/worker", Kind: schema.KindService},
-			{ID: "datastore:k8s/prod/db", Kind: schema.KindDatastore},
+			{ID: "context:@prod/prod", Kind: schema.KindBoundary},
+			{ID: "container:@prod/api", Kind: schema.KindService},
+			{ID: "container:@prod/worker", Kind: schema.KindService},
+			{ID: "container:@prod/db", Kind: schema.KindDatastore},
 		},
 		Edges: []schema.Edge{
-			{From: "boundary:k8s/prod/prod", To: "service:k8s/prod/api", Kind: schema.EdgeContains},
-			{From: "boundary:k8s/prod/prod", To: "service:k8s/prod/worker", Kind: schema.EdgeContains},
-			{From: "boundary:k8s/prod/prod", To: "datastore:k8s/prod/db", Kind: schema.EdgeContains},
-			{From: "service:k8s/prod/api", To: "datastore:k8s/prod/db", Kind: schema.EdgePersistsTo},
-			{From: "service:k8s/prod/worker", To: "datastore:k8s/prod/db", Kind: schema.EdgePersistsTo},
+			{From: "context:@prod/prod", To: "container:@prod/api", Kind: schema.EdgeContains},
+			{From: "context:@prod/prod", To: "container:@prod/worker", Kind: schema.EdgeContains},
+			{From: "context:@prod/prod", To: "container:@prod/db", Kind: schema.EdgeContains},
+			{From: "container:@prod/api", To: "container:@prod/db", Kind: schema.EdgePersistsTo},
+			{From: "container:@prod/worker", To: "container:@prod/db", Kind: schema.EdgePersistsTo},
 		},
 	}
 	system.Measure()
@@ -467,13 +467,13 @@ func TestMeasureSeparatesASystemFromACollection(t *testing.T) {
 func TestContainmentDoesNotImplyRelationship(t *testing.T) {
 	g := schema.Graph{
 		Nodes: []schema.Node{
-			{ID: "boundary:helm/r/repo", Kind: schema.KindBoundary},
-			{ID: "service:helm/r/a", Kind: schema.KindService},
-			{ID: "service:helm/r/b", Kind: schema.KindService},
+			{ID: "context:@r/repo", Kind: schema.KindBoundary},
+			{ID: "container:@r/a", Kind: schema.KindService},
+			{ID: "container:@r/b", Kind: schema.KindService},
 		},
 		Edges: []schema.Edge{
-			{From: "boundary:helm/r/repo", To: "service:helm/r/a", Kind: schema.EdgeContains},
-			{From: "boundary:helm/r/repo", To: "service:helm/r/b", Kind: schema.EdgeContains},
+			{From: "context:@r/repo", To: "container:@r/a", Kind: schema.EdgeContains},
+			{From: "context:@r/repo", To: "container:@r/b", Kind: schema.EdgeContains},
 		},
 	}
 	g.Measure()
@@ -494,10 +494,10 @@ func TestContainmentDoesNotImplyRelationship(t *testing.T) {
 func TestMeasureRunsOnNormalize(t *testing.T) {
 	g := schema.Graph{
 		Nodes: []schema.Node{
-			{ID: "service:k8s/p/a", Kind: schema.KindService},
-			{ID: "service:k8s/p/b", Kind: schema.KindService},
+			{ID: "container:@p/a", Kind: schema.KindService},
+			{ID: "container:@p/b", Kind: schema.KindService},
 		},
-		Edges: []schema.Edge{{ID: "e1", From: "service:k8s/p/a", To: "service:k8s/p/b", Kind: schema.EdgeCalls}},
+		Edges: []schema.Edge{{ID: "e1", From: "container:@p/a", To: "container:@p/b", Kind: schema.EdgeCalls}},
 	}
 	g.Normalize()
 

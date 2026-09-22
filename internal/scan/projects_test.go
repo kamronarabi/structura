@@ -122,8 +122,8 @@ func runProjects(t *testing.T, root string, projects []string) schema.Graph {
 }
 
 func projectOf(n schema.Node) string {
-	if p, ok := n.Attrs["project"].(string); ok && p != "" {
-		return p
+	if n.Project != "" {
+		return n.Project
 	}
 	return "."
 }
@@ -444,14 +444,14 @@ func TestNonCollidingProjectsKeepReadableIdentifiers(t *testing.T) {
 			t.Fatalf("ParseNodeID(%q) = %v", n.ID, err)
 		}
 		for _, project := range []string{"shop", "billing"} {
-			if !strings.HasPrefix(parsed.Namespace, project+"-") {
+			if !strings.HasPrefix(parsed.Scope, project+"-") {
 				continue
 			}
 			// "shop-prod" is what it should read. "shop-1a2b3c-prod" means a
 			// collision was declared where there is none.
-			rest := strings.TrimPrefix(parsed.Namespace, project+"-")
+			rest := strings.TrimPrefix(parsed.Scope, project+"-")
 			if hexish(strings.SplitN(rest, "-", 2)[0]) {
-				t.Errorf("namespace %q carries a digest, but these projects do not collide", parsed.Namespace)
+				t.Errorf("namespace %q carries a digest, but these projects do not collide", parsed.Scope)
 			}
 		}
 	}

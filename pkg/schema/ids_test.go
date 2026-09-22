@@ -10,68 +10,80 @@ import (
 
 func TestNewNodeID(t *testing.T) {
 	tests := []struct {
-		name                          string
-		kind                          schema.NodeKind
-		source, namespace, entityName string
-		want                          string
+		name              string
+		kind              schema.NodeKind
+		scope, entityName string
+		want              string
 	}{
 		{
-			name: "plain k8s service",
-			kind: schema.KindService, source: "k8s", namespace: "prod", entityName: "api-gateway",
-			want: "service:k8s/prod/api-gateway",
+			name: "a scope is marked so it cannot be read as part of the name",
+			kind: schema.KindService, scope: "prod", entityName: "api-gateway",
+			want: "container:@prod/api-gateway",
+		},
+		{
+			name: "most components have no scope, and say so by omission",
+			kind: schema.KindService, scope: "", entityName: "api-gateway",
+			want: "container:api-gateway",
+		},
+		{
+			name: "the layer is what the identifier carries, not the kind",
+			kind: schema.KindDatastore, scope: "prod", entityName: "orders-db",
+			want: "container:@prod/orders-db",
+		},
+		{
+			// The reading that named an image and the reading that did not
+			// have to land on one identifier, or one database is two boxes.
+			name: "a datastore and a service with one name are one identifier",
+			kind: schema.KindService, scope: "", entityName: "carts-db",
+			want: "container:carts-db",
+		},
+		{
+			name: "a boundary is distinguishable from what it contains",
+			kind: schema.KindBoundary, scope: "", entityName: "podinfo",
+			want: "context:podinfo",
 		},
 		{
 			name: "case is folded so two spellings are one node",
-			kind: schema.KindService, source: "K8s", namespace: "Prod", entityName: "API-Gateway",
-			want: "service:k8s/prod/api-gateway",
+			kind: schema.KindService, scope: "Prod", entityName: "API-Gateway",
+			want: "container:@prod/api-gateway",
 		},
 		{
 			name: "package names keep their slashes",
-			kind: schema.KindPackage, source: "gomod", namespace: "root", entityName: "github.com/spf13/cobra",
-			want: "package:gomod/root/github.com/spf13/cobra",
-		},
-		{
-			name: "missing namespace falls back to default",
-			kind: schema.KindDatastore, source: "compose", namespace: "", entityName: "postgres",
-			want: "datastore:compose/default/postgres",
-		},
-		{
-			name: "missing source falls back to unknown",
-			kind: schema.KindExternal, source: "", namespace: "net", entityName: "api.stripe.com",
-			want: "external:unknown/net/api.stripe.com",
+			kind: schema.KindPackage, scope: "", entityName: "github.com/spf13/cobra",
+			want: "container:github.com/spf13/cobra",
 		},
 		{
 			name: "runs of invalid characters collapse to one hyphen",
-			kind: schema.KindService, source: "k8s", namespace: "prod", entityName: "my  weird!!name",
-			want: "service:k8s/prod/my-weird-name",
+			kind: schema.KindService, scope: "prod", entityName: "my  weird!!name",
+			want: "container:@prod/my-weird-name",
 		},
 		{
 			name: "surrounding whitespace and punctuation are trimmed",
-			kind: schema.KindService, source: "k8s", namespace: "prod", entityName: "  -api-  ",
-			want: "service:k8s/prod/api",
+			kind: schema.KindService, scope: "prod", entityName: "  -api-  ",
+			want: "container:@prod/api",
 		},
 		{
 			name: "doubled and edge slashes in a name are cleaned up",
-			kind: schema.KindPackage, source: "npm", namespace: "root", entityName: "/@scope//pkg/",
-			want: "package:npm/root/scope/pkg",
+			kind: schema.KindPackage, scope: "", entityName: "/@scope//pkg/",
+			want: "container:scope/pkg",
 		},
 		{
 			name: "a name that normalizes away becomes unknown rather than empty",
-			kind: schema.KindService, source: "k8s", namespace: "prod", entityName: "!!!",
-			want: "service:k8s/prod/unknown",
+			kind: schema.KindService, scope: "prod", entityName: "!!!",
+			want: "container:@prod/unknown",
 		},
 		{
 			// Folding cannot represent é at all, so the fold alone would put
 			// this component and any other non-Latin name on the same id.
 			name: "a name folding cannot represent carries a discriminator",
-			kind: schema.KindService, source: "k8s", namespace: "prod", entityName: "café-service",
-			want: "service:k8s/prod/caf-service.21d4e6ea",
+			kind: schema.KindService, scope: "prod", entityName: "café-service",
+			want: "container:@prod/caf-service.21d4e6ea",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := schema.NewNodeID(tt.kind, tt.source, tt.namespace, tt.entityName)
+			got := schema.NewNodeID(tt.kind, tt.scope, tt.entityName)
 			if got != tt.want {
 				t.Errorf("NewNodeID() = %q, want %q", got, tt.want)
 			}
@@ -84,16 +96,61 @@ func TestNewNodeID(t *testing.T) {
 	}
 }
 
+// The ambiguity the scope marker exists to prevent: a name may contain
+// slashes, so position alone cannot say which segment is which.
+func TestAScopeIsNeverConfusedWithASlashedName(t *testing.T) {
+	scoped := schema.NewNodeID(schema.KindService, "acme", "api")
+	slashed := schema.NewNodeID(schema.KindService, "", "acme/api")
+	if scoped == slashed {
+		t.Fatalf("the service api in scope acme and the module acme/api share an identifier: %q", scoped)
+	}
+
+	p, err := schema.ParseNodeID(scoped)
+	if err != nil {
+		t.Fatalf("ParseNodeID(%q) = %v", scoped, err)
+	}
+	if p.Scope != "acme" || p.Name != "api" {
+		t.Errorf("parsed %q as scope=%q name=%q", scoped, p.Scope, p.Name)
+	}
+	if p, err = schema.ParseNodeID(slashed); err != nil {
+		t.Fatalf("ParseNodeID(%q) = %v", slashed, err)
+	}
+	if p.Scope != "" || p.Name != "acme/api" {
+		t.Errorf("parsed %q as scope=%q name=%q", slashed, p.Scope, p.Name)
+	}
+}
+
+// Every kind that maps to one layer must produce one identifier. This is what
+// lets a Compose file that named an image and a sibling that did not describe
+// the same component.
+func TestKindsSharingALayerShareAnIdentifier(t *testing.T) {
+	container := []schema.NodeKind{
+		schema.KindService, schema.KindDatastore, schema.KindQueue,
+		schema.KindCloudResource, schema.KindPackage,
+	}
+	want := schema.NewNodeID(container[0], "prod", "thing")
+	for _, kind := range container[1:] {
+		if got := schema.NewNodeID(kind, "prod", "thing"); got != want {
+			t.Errorf("NewNodeID(%q, ...) = %q, want %q", kind, got, want)
+		}
+	}
+
+	// And a kind in another layer must not.
+	if got := schema.NewNodeID(schema.KindBoundary, "prod", "thing"); got == want {
+		t.Errorf("a boundary shares an identifier with a container: %q", got)
+	}
+}
+
 func TestNodeIDIsIdempotent(t *testing.T) {
 	// Feeding a constructed ID's parts back through the constructor must be
 	// a fixed point; otherwise re-derived IDs would drift.
 	for _, raw := range []string{"API Gateway", "user_service", "github.com/spf13/cobra", "x"} {
-		id := schema.NewNodeID(schema.KindService, "k8s", "prod", raw)
+		id := schema.NewNodeID(schema.KindService, "prod", raw)
 		p, err := schema.ParseNodeID(id)
 		if err != nil {
 			t.Fatalf("ParseNodeID(%q) = %v", id, err)
 		}
-		again := schema.NewNodeID(p.Kind, p.Source, p.Namespace, p.Name)
+		again := schema.NewNodeID(schema.KindService, p.Scope, p.Name)
 		if again != id {
 			t.Errorf("round trip of %q: got %q, want %q", raw, again, id)
 		}
@@ -106,13 +163,14 @@ func TestParseNodeIDRejects(t *testing.T) {
 		id   string
 	}{
 		{"empty", ""},
-		{"no kind prefix", "k8s/prod/api"},
-		{"unknown kind", "widget:k8s/prod/api"},
-		{"too few segments", "service:k8s/api"},
-		{"empty source segment", "service:/prod/api"},
-		{"empty namespace segment", "service:k8s//api"},
-		{"not normalized", "service:k8s/prod/API"},
-		{"trailing slash leaves an empty name", "service:k8s/prod/"},
+		{"no layer prefix", "prod/api"},
+		{"unknown layer", "widget:api"},
+		{"a kind where a layer belongs", "service:api"},
+		{"scope marker with no name", "container:@prod"},
+		{"empty scope segment", "container:@/api"},
+		{"not normalized", "container:@prod/API"},
+		{"trailing slash leaves an empty name", "container:@prod/"},
+		{"an unmarked scope is a name, and this one is not normalized", "container:@Prod/api"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -126,7 +184,7 @@ func TestParseNodeIDRejects(t *testing.T) {
 }
 
 func TestNewEdgeIDIsStableAndDistinct(t *testing.T) {
-	const from, to = "service:k8s/prod/api", "datastore:k8s/prod/db"
+	const from, to = "container:@prod/api", "container:@prod/db"
 
 	a := schema.NewEdgeID(from, to, schema.EdgePersistsTo, "postgres")
 	if b := schema.NewEdgeID(from, to, schema.EdgePersistsTo, "postgres"); a != b {
@@ -159,7 +217,7 @@ func TestNamesFoldingCannotRepresentStayDistinct(t *testing.T) {
 
 	seen := map[string]string{}
 	for _, n := range names {
-		id := schema.NewNodeID(schema.KindService, "k8s", "prod", n)
+		id := schema.NewNodeID(schema.KindService, "prod", n)
 		if prev, ok := seen[id]; ok {
 			t.Errorf("%q and %q share the id %s", prev, n, id)
 		}
@@ -174,9 +232,9 @@ func TestNamesFoldingCannotRepresentStayDistinct(t *testing.T) {
 // case must keep folding together. A discriminator here would split one
 // component into several, which is the opposite failure.
 func TestSpellingVariantsStillFoldTogether(t *testing.T) {
-	want := schema.NewNodeID(schema.KindService, "k8s", "prod", "api-gateway")
+	want := schema.NewNodeID(schema.KindService, "prod", "api-gateway")
 	for _, spelling := range []string{"API-Gateway", "  -api-gateway-  ", "api  gateway", "API gateway"} {
-		if got := schema.NewNodeID(schema.KindService, "k8s", "prod", spelling); got != want {
+		if got := schema.NewNodeID(schema.KindService, "prod", spelling); got != want {
 			t.Errorf("%q gave %s, want %s; one component must not become two", spelling, got, want)
 		}
 	}
@@ -207,7 +265,7 @@ func TestSymbolIDsKeepEveryDifference(t *testing.T) {
 
 	seen := map[string]string{}
 	for _, c := range cases {
-		id := schema.NewSymbolID(schema.KindService, "go", "checkout", c.path, c.symbol)
+		id := schema.NewSymbolID(schema.KindService, "checkout", c.path, c.symbol)
 		key := c.path + "::" + c.symbol
 		if prev, ok := seen[id]; ok {
 			t.Errorf("%s and %s share the id %s", prev, key, id)
@@ -224,8 +282,8 @@ func TestSymbolIDsKeepEveryDifference(t *testing.T) {
 // A symbol that needs no discrimination should not carry any: the id is what
 // a model quotes back, and a hash on every entry would be noise.
 func TestASimpleSymbolStaysReadable(t *testing.T) {
-	id := schema.NewSymbolID(schema.KindService, "go", "checkout", "src/api/routes.go", "main")
-	if want := "service:go/checkout/src/api/routes.go/main"; id != want {
+	id := schema.NewSymbolID(schema.KindService, "checkout", "src/api/routes.go", "main")
+	if want := "container:@checkout/src/api/routes.go/main"; id != want {
 		t.Errorf("NewSymbolID() = %q, want %q", id, want)
 	}
 }
@@ -234,14 +292,14 @@ func TestASimpleSymbolStaysReadable(t *testing.T) {
 // saved and reloaded would come back with different identities.
 func TestQualifiedIDsAreIdempotent(t *testing.T) {
 	for _, id := range []string{
-		schema.NewNodeID(schema.KindService, "k8s", "prod", "café-service"),
-		schema.NewSymbolID(schema.KindService, "go", "checkout", "src/api/handlers.go", "HandleOrder"),
+		schema.NewNodeID(schema.KindService, "prod", "café-service"),
+		schema.NewSymbolID(schema.KindService, "checkout", "src/api/handlers.go", "HandleOrder"),
 	} {
 		p, err := schema.ParseNodeID(id)
 		if err != nil {
 			t.Fatalf("ParseNodeID(%q) = %v", id, err)
 		}
-		if got := schema.NewNodeID(p.Kind, p.Source, p.Namespace, p.Name); got != id {
+		if got := schema.NewNodeID(schema.KindService, p.Scope, p.Name); got != id {
 			t.Errorf("rebuilding %q gave %q", id, got)
 		}
 	}

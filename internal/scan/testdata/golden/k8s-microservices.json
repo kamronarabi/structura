@@ -1,13 +1,167 @@
 {
-  "schemaVersion": "0.3.0",
+  "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:07fc8fa2297e0bc088129e2b912cbd58056640e41a6c3d8dc9549416e1aed699",
+  "contentHash": "sha256:2f150bfc2747d2846ccda34ce90d492258fa73ea5d9c43d6ecf0eb3f64146b31",
   "root": {
     "name": "k8s-microservices"
   },
   "nodes": [
     {
-      "id": "boundary:k8s/prod/prod",
+      "id": "container:@prod/api-gateway",
+      "kind": "service",
+      "layer": "container",
+      "name": "api-gateway",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "image": "ghcr.io/acme/api-gateway:1.2.0",
+        "images": [
+          "ghcr.io/acme/api-gateway:1.2.0"
+        ],
+        "labels": {
+          "app": "api-gateway"
+        },
+        "ports": [
+          8080
+        ],
+        "replicas": 3,
+        "serviceAccount": "api-gateway",
+        "workload": "Deployment"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "container:@prod/checkout",
+      "kind": "service",
+      "layer": "container",
+      "name": "checkout",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes"
+      },
+      "attrs": {
+        "image": "ghcr.io/acme/checkout:2.0.1",
+        "images": [
+          "ghcr.io/acme/checkout:2.0.1"
+        ],
+        "labels": {
+          "app": "checkout"
+        },
+        "ports": [
+          8080
+        ],
+        "replicas": 2,
+        "workload": "Deployment"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/checkout.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "container:@prod/orders-db",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "orders-db",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "postgresql"
+      },
+      "attrs": {
+        "image": "postgres:16-alpine",
+        "images": [
+          "postgres:16-alpine"
+        ],
+        "labels": {
+          "app": "orders-db"
+        },
+        "ports": [
+          5432
+        ],
+        "replicas": 1,
+        "workload": "StatefulSet"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "container:@prod/public",
+      "kind": "cloud_resource",
+      "layer": "container",
+      "name": "public",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "ingress"
+      },
+      "attrs": {
+        "hosts": [
+          "shop.example.com"
+        ],
+        "ingressClass": "nginx",
+        "tls": true,
+        "workload": "Ingress"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/ingress.yaml",
+          "line": 4
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "container:@prod/session-cache",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "session-cache",
+      "namespace": "prod",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "redis"
+      },
+      "attrs": {
+        "image": "redis:7-alpine",
+        "images": [
+          "redis:7-alpine"
+        ],
+        "labels": {
+          "app": "session-cache"
+        },
+        "workload": "Deployment"
+      },
+      "sources": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 26
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "context:@prod/prod",
       "kind": "boundary",
       "layer": "context",
       "name": "prod",
@@ -49,96 +203,7 @@
       "confidence": 1
     },
     {
-      "id": "cloud_resource:k8s/prod/public",
-      "kind": "cloud_resource",
-      "layer": "container",
-      "name": "public",
-      "namespace": "prod",
-      "tech": {
-        "runtime": "kubernetes",
-        "framework": "ingress"
-      },
-      "attrs": {
-        "hosts": [
-          "shop.example.com"
-        ],
-        "ingressClass": "nginx",
-        "tls": true,
-        "workload": "Ingress"
-      },
-      "sources": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/ingress.yaml",
-          "line": 4
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "id": "datastore:k8s/prod/orders-db",
-      "kind": "datastore",
-      "layer": "container",
-      "name": "orders-db",
-      "namespace": "prod",
-      "tech": {
-        "runtime": "kubernetes",
-        "framework": "postgresql"
-      },
-      "attrs": {
-        "image": "postgres:16-alpine",
-        "images": [
-          "postgres:16-alpine"
-        ],
-        "labels": {
-          "app": "orders-db"
-        },
-        "ports": [
-          5432
-        ],
-        "replicas": 1,
-        "workload": "StatefulSet"
-      },
-      "sources": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/data.yaml",
-          "line": 4
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "id": "datastore:k8s/prod/session-cache",
-      "kind": "datastore",
-      "layer": "container",
-      "name": "session-cache",
-      "namespace": "prod",
-      "tech": {
-        "runtime": "kubernetes",
-        "framework": "redis"
-      },
-      "attrs": {
-        "image": "redis:7-alpine",
-        "images": [
-          "redis:7-alpine"
-        ],
-        "labels": {
-          "app": "session-cache"
-        },
-        "workload": "Deployment"
-      },
-      "sources": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/data.yaml",
-          "line": 26
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "id": "external:resolver/net/analytics.example.com",
+      "id": "context:analytics.example.com",
       "kind": "external",
       "layer": "context",
       "name": "analytics.example.com",
@@ -156,7 +221,7 @@
       "confidence": 0.8
     },
     {
-      "id": "external:resolver/net/api.stripe.com",
+      "id": "context:api.stripe.com",
       "kind": "external",
       "layer": "context",
       "name": "api.stripe.com",
@@ -174,7 +239,7 @@
       "confidence": 0.8
     },
     {
-      "id": "external:resolver/net/warehouse.legacy.internal",
+      "id": "context:warehouse.legacy.internal",
       "kind": "external",
       "layer": "context",
       "name": "warehouse.legacy.internal",
@@ -190,226 +255,13 @@
         }
       ],
       "confidence": 0.8
-    },
-    {
-      "id": "service:k8s/prod/api-gateway",
-      "kind": "service",
-      "layer": "container",
-      "name": "api-gateway",
-      "namespace": "prod",
-      "tech": {
-        "runtime": "kubernetes"
-      },
-      "attrs": {
-        "image": "ghcr.io/acme/api-gateway:1.2.0",
-        "images": [
-          "ghcr.io/acme/api-gateway:1.2.0"
-        ],
-        "labels": {
-          "app": "api-gateway"
-        },
-        "ports": [
-          8080
-        ],
-        "replicas": 3,
-        "serviceAccount": "api-gateway",
-        "workload": "Deployment"
-      },
-      "sources": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/api-gateway.yaml",
-          "line": 4
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "id": "service:k8s/prod/checkout",
-      "kind": "service",
-      "layer": "container",
-      "name": "checkout",
-      "namespace": "prod",
-      "tech": {
-        "runtime": "kubernetes"
-      },
-      "attrs": {
-        "image": "ghcr.io/acme/checkout:2.0.1",
-        "images": [
-          "ghcr.io/acme/checkout:2.0.1"
-        ],
-        "labels": {
-          "app": "checkout"
-        },
-        "ports": [
-          8080
-        ],
-        "replicas": 2,
-        "workload": "Deployment"
-      },
-      "sources": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/checkout.yaml",
-          "line": 4
-        }
-      ],
-      "confidence": 1
     }
   ],
   "edges": [
     {
-      "id": "e:52039424b50b",
-      "from": "boundary:k8s/prod/prod",
-      "to": "cloud_resource:k8s/prod/public",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/ingress.yaml",
-          "line": 4,
-          "rule": "k8s_namespace_member",
-          "detail": "deployed into namespace \"prod\""
-        }
-      ]
-    },
-    {
-      "id": "e:a53ac5c74dfd",
-      "from": "boundary:k8s/prod/prod",
-      "to": "datastore:k8s/prod/orders-db",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/data.yaml",
-          "line": 4,
-          "rule": "k8s_namespace_member",
-          "detail": "deployed into namespace \"prod\""
-        }
-      ]
-    },
-    {
-      "id": "e:e520872b1918",
-      "from": "boundary:k8s/prod/prod",
-      "to": "datastore:k8s/prod/session-cache",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/data.yaml",
-          "line": 26,
-          "rule": "k8s_namespace_member",
-          "detail": "deployed into namespace \"prod\""
-        }
-      ]
-    },
-    {
-      "id": "e:004b8558baac",
-      "from": "boundary:k8s/prod/prod",
-      "to": "service:k8s/prod/api-gateway",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/api-gateway.yaml",
-          "line": 4,
-          "rule": "k8s_namespace_member",
-          "detail": "deployed into namespace \"prod\""
-        }
-      ]
-    },
-    {
-      "id": "e:fbd7a0d1e848",
-      "from": "boundary:k8s/prod/prod",
-      "to": "service:k8s/prod/checkout",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/checkout.yaml",
-          "line": 4,
-          "rule": "k8s_namespace_member",
-          "detail": "deployed into namespace \"prod\""
-        }
-      ]
-    },
-    {
-      "id": "e:12a90f37ed2f",
-      "from": "cloud_resource:k8s/prod/public",
-      "to": "service:k8s/prod/api-gateway",
-      "kind": "exposes",
-      "protocol": "http",
-      "confidence": 0.95,
-      "evidence": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/ingress.yaml",
-          "line": 4,
-          "rule": "dns_exact",
-          "detail": "Ingress \"public\" routes shop.example.com/api to Service \"api-gateway\" (resolves to api-gateway)"
-        }
-      ]
-    },
-    {
-      "id": "e:36ffc49c45a1",
-      "from": "cloud_resource:k8s/prod/public",
-      "to": "service:k8s/prod/checkout",
-      "kind": "exposes",
-      "protocol": "http",
-      "confidence": 0.95,
-      "evidence": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/ingress.yaml",
-          "line": 4,
-          "rule": "dns_exact",
-          "detail": "Ingress \"public\" routes shop.example.com/checkout to Service \"checkout\" (resolves to checkout)"
-        }
-      ]
-    },
-    {
-      "id": "e:5459f8b281ba",
-      "from": "service:k8s/prod/api-gateway",
-      "to": "datastore:k8s/prod/session-cache",
-      "kind": "persists_to",
-      "protocol": "redis",
-      "confidence": 0.8,
-      "evidence": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/api-gateway.yaml",
-          "line": 4,
-          "rule": "dns_exact",
-          "detail": "container \"api\" env REDIS_URL=redis://session-cache:6379/0 (resolves to session-cache)"
-        }
-      ]
-    },
-    {
-      "id": "e:a59a8fed42e9",
-      "from": "service:k8s/prod/api-gateway",
-      "to": "external:resolver/net/analytics.example.com",
-      "kind": "calls",
-      "protocol": "https",
-      "confidence": 0.7,
-      "evidence": [
-        {
-          "extractor": "k8s",
-          "path": "deploy/prod/api-gateway.yaml",
-          "line": 4,
-          "rule": "external_host",
-          "detail": "container \"api\" takes its environment from ConfigMap \"shared-endpoints\"; ConfigMap \"shared-endpoints\" key ANALYTICS_URL=https://analytics.example.com/ingest (resolves to analytics.example.com)"
-        }
-      ]
-    },
-    {
-      "id": "e:6aa274ff0c0d",
-      "from": "service:k8s/prod/api-gateway",
-      "to": "service:k8s/prod/checkout",
+      "id": "e:06ab91ae20db",
+      "from": "container:@prod/api-gateway",
+      "to": "container:@prod/checkout",
       "kind": "calls",
       "protocol": "http",
       "confidence": 0.8,
@@ -424,9 +276,43 @@
       ]
     },
     {
-      "id": "e:178e6b350e4a",
-      "from": "service:k8s/prod/checkout",
-      "to": "datastore:k8s/prod/orders-db",
+      "id": "e:70ea54e717f8",
+      "from": "container:@prod/api-gateway",
+      "to": "container:@prod/session-cache",
+      "kind": "persists_to",
+      "protocol": "redis",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4,
+          "rule": "dns_exact",
+          "detail": "container \"api\" env REDIS_URL=redis://session-cache:6379/0 (resolves to session-cache)"
+        }
+      ]
+    },
+    {
+      "id": "e:409c4e20b651",
+      "from": "container:@prod/api-gateway",
+      "to": "context:analytics.example.com",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.7,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4,
+          "rule": "external_host",
+          "detail": "container \"api\" takes its environment from ConfigMap \"shared-endpoints\"; ConfigMap \"shared-endpoints\" key ANALYTICS_URL=https://analytics.example.com/ingest (resolves to analytics.example.com)"
+        }
+      ]
+    },
+    {
+      "id": "e:11dacf91e9f5",
+      "from": "container:@prod/checkout",
+      "to": "container:@prod/orders-db",
       "kind": "persists_to",
       "protocol": "postgres",
       "confidence": 0.8,
@@ -441,9 +327,9 @@
       ]
     },
     {
-      "id": "e:0e669aed75df",
-      "from": "service:k8s/prod/checkout",
-      "to": "external:resolver/net/api.stripe.com",
+      "id": "e:839574f383e8",
+      "from": "container:@prod/checkout",
+      "to": "context:api.stripe.com",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.8,
@@ -454,6 +340,120 @@
           "line": 4,
           "rule": "external_host",
           "detail": "container \"checkout\" env STRIPE_API_URL=https://api.stripe.com (resolves to api.stripe.com)"
+        }
+      ]
+    },
+    {
+      "id": "e:0f54cd6ca561",
+      "from": "container:@prod/public",
+      "to": "container:@prod/api-gateway",
+      "kind": "exposes",
+      "protocol": "http",
+      "confidence": 0.95,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/ingress.yaml",
+          "line": 4,
+          "rule": "dns_exact",
+          "detail": "Ingress \"public\" routes shop.example.com/api to Service \"api-gateway\" (resolves to api-gateway)"
+        }
+      ]
+    },
+    {
+      "id": "e:cb86bb869286",
+      "from": "container:@prod/public",
+      "to": "container:@prod/checkout",
+      "kind": "exposes",
+      "protocol": "http",
+      "confidence": 0.95,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/ingress.yaml",
+          "line": 4,
+          "rule": "dns_exact",
+          "detail": "Ingress \"public\" routes shop.example.com/checkout to Service \"checkout\" (resolves to checkout)"
+        }
+      ]
+    },
+    {
+      "id": "e:0717cb1f4aa4",
+      "from": "context:@prod/prod",
+      "to": "container:@prod/api-gateway",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/api-gateway.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
+        }
+      ]
+    },
+    {
+      "id": "e:05403d90519f",
+      "from": "context:@prod/prod",
+      "to": "container:@prod/checkout",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/checkout.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
+        }
+      ]
+    },
+    {
+      "id": "e:4534441a7c5b",
+      "from": "context:@prod/prod",
+      "to": "container:@prod/orders-db",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
+        }
+      ]
+    },
+    {
+      "id": "e:d75b0080988d",
+      "from": "context:@prod/prod",
+      "to": "container:@prod/public",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/ingress.yaml",
+          "line": 4,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
+        }
+      ]
+    },
+    {
+      "id": "e:67609d2b885a",
+      "from": "context:@prod/prod",
+      "to": "container:@prod/session-cache",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "k8s",
+          "path": "deploy/prod/data.yaml",
+          "line": 26,
+          "rule": "k8s_namespace_member",
+          "detail": "deployed into namespace \"prod\""
         }
       ]
     }

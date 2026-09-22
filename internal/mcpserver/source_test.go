@@ -69,16 +69,16 @@ func storedVersion(t *testing.T, root string) string {
 // this build cannot represent -- and the diff would look like the
 // architecture changed.
 func TestANewerStoredGraphIsServedRatherThanOverwritten(t *testing.T) {
-	root := storedGraph(t, "compose-monolith", "0.99.0")
+	root := storedGraph(t, "compose-monolith", "1.99.0")
 
 	g, err := newSource(root).Graph(context.Background())
 	if err != nil {
 		t.Fatalf("loading the graph: %v", err)
 	}
-	if g.SchemaVersion != "0.99.0" {
+	if g.SchemaVersion != "1.99.0" {
 		t.Errorf("served schema %s; the newer stored graph was discarded", g.SchemaVersion)
 	}
-	if got := storedVersion(t, root); got != "0.99.0" {
+	if got := storedVersion(t, root); got != "1.99.0" {
 		t.Errorf("stored graph is now schema %s; this build overwrote a newer one", got)
 	}
 }

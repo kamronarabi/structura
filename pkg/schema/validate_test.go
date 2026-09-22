@@ -19,7 +19,7 @@ func svc(id string) schema.Node {
 // committed and read by other tools. Each rule below is the only thing
 // standing between a specific kind of nonsense and graph.json.
 func TestNodeValidate(t *testing.T) {
-	good := svc(schema.NewNodeID(schema.KindService, "k8s", "prod", "api"))
+	good := svc(schema.NewNodeID(schema.KindService, "prod", "api"))
 	if err := good.Validate(); err != nil {
 		t.Fatalf("a well-formed node did not validate: %v", err)
 	}
@@ -58,8 +58,8 @@ func TestNodeValidate(t *testing.T) {
 }
 
 func TestEdgeValidate(t *testing.T) {
-	from := schema.NewNodeID(schema.KindService, "k8s", "prod", "a")
-	to := schema.NewNodeID(schema.KindService, "k8s", "prod", "b")
+	from := schema.NewNodeID(schema.KindService, "prod", "a")
+	to := schema.NewNodeID(schema.KindService, "prod", "b")
 	good := schema.Edge{
 		ID: "e:1", From: from, To: to, Kind: schema.EdgeCalls, Confidence: 0.8,
 		Evidence: []schema.Evidence{{Extractor: "k8s", Rule: "dns_exact", Path: "a.yaml"}},
@@ -160,7 +160,7 @@ func TestConfidenceNormalization(t *testing.T) {
 		{"negative infinity becomes zero", math.Inf(-1), 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			n := svc(schema.NewNodeID(schema.KindService, "k8s", "prod", "api"))
+			n := svc(schema.NewNodeID(schema.KindService, "prod", "api"))
 			n.Confidence = tt.in
 			g := schema.Graph{Nodes: []schema.Node{n}}
 			g.Normalize()
@@ -181,7 +181,7 @@ func TestConfidenceNormalization(t *testing.T) {
 // to accumulate what each contributes without the more confident reading
 // losing to whatever happened to arrive first.
 func TestMergingAccumulatesWhatEachExtractorKnows(t *testing.T) {
-	id := schema.NewNodeID(schema.KindService, "compose", "app", "api")
+	id := schema.NewNodeID(schema.KindService, "app", "api")
 	tech := func(lang, runtime, framework string) *schema.Tech {
 		return &schema.Tech{Language: lang, Runtime: runtime, Framework: framework}
 	}

@@ -118,7 +118,7 @@ func (e *Extractor) emit(f *scan.File, emit scan.Emitter, comp *component) {
 	if idPath == "." {
 		idPath = "root"
 	}
-	id := schema.NewNodeID(schema.KindService, Name, comp.language, idPath)
+	id := schema.NewNodeID(schema.KindService, "", idPath)
 
 	// Dependencies arrive from JSON and TOML maps, whose iteration order is
 	// random. Sorting here is not cosmetic: without it, a package.json
@@ -143,14 +143,15 @@ func (e *Extractor) emit(f *scan.File, emit scan.Emitter, comp *component) {
 
 	src := schema.Source{Extractor: Name, Path: f.Path, Line: comp.line}
 	emit.Node(schema.Node{
-		ID:        id,
-		Kind:      schema.KindService,
-		Layer:     schema.LayerContainer,
-		Name:      comp.name,
-		Namespace: comp.language,
-		Tech:      &schema.Tech{Language: comp.language, Framework: framework},
-		Attrs:     attrs,
-		Sources:   []schema.Source{src},
+		ID:    id,
+		Kind:  schema.KindService,
+		Layer: schema.LayerContainer,
+		Name:  comp.name,
+		// No namespace: a language is not a deployment scope, and the language
+		// is on Tech where a reader and the resolver both look for it.
+		Tech:    &schema.Tech{Language: comp.language, Framework: framework},
+		Attrs:   attrs,
+		Sources: []schema.Source{src},
 		// A manifest proves a codebase exists here, not that it is deployed
 		// as its own service. An infrastructure file saying so is what
 		// raises this, via the merge.
@@ -165,7 +166,6 @@ func (e *Extractor) emit(f *scan.File, emit scan.Emitter, comp *component) {
 	}
 	emit.Alias(resolve.Alias{
 		Name:       path.Base(dir),
-		Namespace:  comp.language,
 		DNS:        aliasNames,
 		TargetName: comp.name,
 		Source: schema.Evidence{

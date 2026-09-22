@@ -154,7 +154,7 @@ func (m *module) collectDeclarations(body *hclsyntax.Body) {
 }
 
 func (m *module) nodeID(kind schema.NodeKind, resourceType, name string) string {
-	return schema.NewNodeID(kind, Name, m.namespace, resourceType+"."+name)
+	return schema.NewNodeID(kind, m.namespace, resourceType+"."+name)
 }
 
 func (m *module) emitAll(body *hclsyntax.Body, emit scan.Emitter) {

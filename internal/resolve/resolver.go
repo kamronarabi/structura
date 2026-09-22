@@ -55,9 +55,6 @@ func Resolve(in Input) Result {
 		r.byID[r.nodes[i].ID] = &r.nodes[i]
 	}
 
-	r.mergeKindConflicts()
-	r.reindexSurvivors()
-
 	r.mergeDirectoryDuplicates()
 	r.reindexSurvivors()
 
@@ -799,7 +796,7 @@ func (r *resolver) reachesVendor(from, tech string) string {
 // Giving the node a plausible-looking hostname would be inventing the one
 // fact the evidence does not support.
 func (r *resolver) ensureVendor(tech string, source schema.Evidence) string {
-	id := schema.NewNodeID(schema.KindExternal, "resolver", "vendor", tech)
+	id := schema.NewNodeID(schema.KindExternal, "", tech)
 	if _, exists := r.byID[id]; exists {
 		return id
 	}
@@ -878,7 +875,7 @@ func (r *resolver) unmatched(h Hint) {
 // ensureExternal returns the node for a third-party host, creating it once.
 func (r *resolver) ensureExternal(host string, source schema.Evidence) string {
 	host = strings.ToLower(strings.TrimSuffix(host, "."))
-	id := schema.NewNodeID(schema.KindExternal, "resolver", "net", host)
+	id := schema.NewNodeID(schema.KindExternal, "", host)
 	if _, exists := r.byID[id]; exists {
 		return id
 	}

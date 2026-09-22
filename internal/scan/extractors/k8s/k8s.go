@@ -241,7 +241,7 @@ func namespaceOf(m *manifest) string {
 // itself enforces for naming, DNS and access, which is the same line the
 // resolver already refuses to match across.
 func emitNamespaceBoundary(f *scan.File, emit scan.Emitter, memberID, ns string, line int) {
-	boundaryID := schema.NewNodeID(schema.KindBoundary, Name, ns, ns)
+	boundaryID := schema.NewNodeID(schema.KindBoundary, scopeOf(ns), ns)
 	if boundaryID == memberID {
 		return
 	}
@@ -304,7 +304,7 @@ func (e *Extractor) emitWorkload(f *scan.File, pos *yamlpos.Locator, doc int, em
 	}
 
 	kind, tech := workloadKind(containers)
-	id := schema.NewNodeID(kind, Name, ns, m.Metadata.Name)
+	id := schema.NewNodeID(kind, scopeOf(ns), m.Metadata.Name)
 
 	attrs := schema.Attrs{"workload": m.Kind}
 	if images := containerImages(containers); len(images) > 0 {
@@ -436,7 +436,7 @@ func (e *Extractor) emitService(f *scan.File, pos *yamlpos.Locator, doc int, emi
 func (e *Extractor) emitIngress(f *scan.File, pos *yamlpos.Locator, doc int, emit scan.Emitter, m *manifest) {
 	ns := namespaceOf(m)
 	line := pos.LineIn(doc, "metadata", "name")
-	id := schema.NewNodeID(schema.KindCloudResource, Name, ns, m.Metadata.Name)
+	id := schema.NewNodeID(schema.KindCloudResource, scopeOf(ns), m.Metadata.Name)
 
 	attrs := schema.Attrs{"workload": "Ingress"}
 	if m.Spec.IngressClassName != "" {
@@ -741,4 +741,19 @@ func formatLabels(labels map[string]string) string {
 
 func isEOF(err error) bool {
 	return err != nil && (err.Error() == "EOF" || strings.Contains(err.Error(), "EOF"))
+}
+
+// scopeOf turns a Kubernetes namespace into an identity scope.
+//
+// "default" is dropped, because it is how Kubernetes spells "nobody said". A
+// manifest with no namespace field lands there, and treating that as a scope
+// made the same service in a chart and in a manifest two components. A
+// repository that really does run things in default loses nothing: the
+// namespace is still on the node, and two projects both using it are still
+// kept apart by the project qualification.
+func scopeOf(namespace string) string {
+	if namespace == "default" {
+		return ""
+	}
+	return namespace
 }

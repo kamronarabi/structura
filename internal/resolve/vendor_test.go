@@ -28,7 +28,7 @@ func libraryHint(from, tech string, vendor bool, edge schema.EdgeKind) resolve.H
 // managed service, with no container and no connection string anywhere.
 func TestVendorDependencyDrawsTheCompany(t *testing.T) {
 	b := &builder{}
-	app := b.node(schema.KindService, "manifest", "javascript", "storefront",
+	app := b.node(schema.KindService, "", "storefront",
 		schema.Attrs{"directory": "."})
 	b.hint(libraryHint(app, "supabase", true, schema.EdgeCalls))
 
@@ -62,7 +62,7 @@ func TestVendorDependencyDrawsTheCompany(t *testing.T) {
 // standing for nothing.
 func TestTechnologyDependencyDrawsNothing(t *testing.T) {
 	b := &builder{}
-	app := b.node(schema.KindService, "manifest", "javascript", "storefront",
+	app := b.node(schema.KindService, "", "storefront",
 		schema.Attrs{"directory": "."})
 	b.hint(libraryHint(app, "postgres", false, schema.EdgePersistsTo))
 
@@ -88,7 +88,7 @@ func TestTechnologyDependencyDrawsNothing(t *testing.T) {
 // corroborates and draws nothing.
 func TestConfigEndpointWinsOverTheVendorName(t *testing.T) {
 	b := &builder{}
-	app := b.node(schema.KindService, "manifest", "javascript", "storefront",
+	app := b.node(schema.KindService, "", "storefront",
 		schema.Attrs{"directory": "."})
 	// An env URL resolved to the real project endpoint.
 	b.hint(resolve.Hint{
@@ -128,8 +128,8 @@ func TestConfigEndpointWinsOverTheVendorName(t *testing.T) {
 // a box per caller.
 func TestOneVendorNodeServesEveryCaller(t *testing.T) {
 	b := &builder{}
-	web := b.node(schema.KindService, "manifest", "javascript", "web", schema.Attrs{"directory": "web"})
-	api := b.node(schema.KindService, "manifest", "go", "api", schema.Attrs{"directory": "api"})
+	web := b.node(schema.KindService, "", "web", schema.Attrs{"directory": "web"})
+	api := b.node(schema.KindService, "", "api", schema.Attrs{"directory": "api"})
 	b.hint(libraryHint(web, "stripe", true, schema.EdgeCalls))
 	b.hint(libraryHint(api, "stripe", true, schema.EdgeCalls))
 
@@ -152,9 +152,9 @@ func TestOneVendorNodeServesEveryCaller(t *testing.T) {
 // that existed before vendors could be drawn.
 func TestDeclaredInstanceIsCorroboratedNotDuplicated(t *testing.T) {
 	b := &builder{}
-	app := b.node(schema.KindService, "compose", "shop", "api", schema.Attrs{"directory": "api"})
+	app := b.node(schema.KindService, "shop", "api", schema.Attrs{"directory": "api"})
 	b.in.Nodes[len(b.in.Nodes)-1].Tech = &schema.Tech{Framework: "redis"}
-	cache := b.node(schema.KindDatastore, "compose", "shop", "cache", nil)
+	cache := b.node(schema.KindDatastore, "shop", "cache", nil)
 	b.in.Nodes[len(b.in.Nodes)-1].Tech = &schema.Tech{Framework: "redis"}
 	_ = cache
 
@@ -181,7 +181,7 @@ func TestDeclaredInstanceIsCorroboratedNotDuplicated(t *testing.T) {
 // as "over supabase".
 func TestVendorEdgeCarriesAUsefulProtocol(t *testing.T) {
 	b := &builder{}
-	app := b.node(schema.KindService, "manifest", "javascript", "web", schema.Attrs{"directory": "."})
+	app := b.node(schema.KindService, "", "web", schema.Attrs{"directory": "."})
 	b.hint(libraryHint(app, "clerk", true, schema.EdgeCalls))
 
 	r := b.run()

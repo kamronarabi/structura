@@ -1,30 +1,13 @@
 {
-  "schemaVersion": "0.3.0",
+  "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:2560405c13398485ceee529dfbcc806fd44994d8a39f5173cd7af9c2d2073bc5",
+  "contentHash": "sha256:9c18fc8ebcb4684f6458ad1830f269315f752f3fd10364b52f50a4b82d0daf45",
   "root": {
     "name": "compose-monolith"
   },
   "nodes": [
     {
-      "id": "boundary:compose/shopfront/shopfront",
-      "kind": "boundary",
-      "layer": "context",
-      "name": "shopfront",
-      "attrs": {
-        "orchestrator": "docker-compose"
-      },
-      "sources": [
-        {
-          "extractor": "compose",
-          "path": "docker-compose.yml",
-          "line": 1
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "id": "datastore:compose/shopfront/cache",
+      "id": "container:@shopfront/cache",
       "kind": "datastore",
       "layer": "container",
       "name": "cache",
@@ -49,7 +32,7 @@
       "confidence": 1
     },
     {
-      "id": "datastore:compose/shopfront/db",
+      "id": "container:@shopfront/db",
       "kind": "datastore",
       "layer": "container",
       "name": "db",
@@ -74,47 +57,7 @@
       "confidence": 1
     },
     {
-      "id": "datastore:compose/shopfront/search",
-      "kind": "datastore",
-      "layer": "container",
-      "name": "search",
-      "namespace": "shopfront",
-      "tech": {
-        "runtime": "container",
-        "framework": "elasticsearch"
-      },
-      "attrs": {
-        "image": "elasticsearch:8.13.0"
-      },
-      "sources": [
-        {
-          "extractor": "compose",
-          "path": "docker-compose.yml",
-          "line": 54
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "id": "external:resolver/net/api.stripe.com",
-      "kind": "external",
-      "layer": "context",
-      "name": "api.stripe.com",
-      "namespace": "net",
-      "attrs": {
-        "hostname": "api.stripe.com"
-      },
-      "sources": [
-        {
-          "extractor": "compose",
-          "path": "docker-compose.yml",
-          "line": 10
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "queue:compose/shopfront/queue",
+      "id": "container:@shopfront/queue",
       "kind": "queue",
       "layer": "container",
       "name": "queue",
@@ -140,7 +83,29 @@
       "confidence": 1
     },
     {
-      "id": "service:compose/shopfront/web",
+      "id": "container:@shopfront/search",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "search",
+      "namespace": "shopfront",
+      "tech": {
+        "runtime": "container",
+        "framework": "elasticsearch"
+      },
+      "attrs": {
+        "image": "elasticsearch:8.13.0"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 54
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "container:@shopfront/web",
       "kind": "service",
       "layer": "container",
       "name": "web",
@@ -166,7 +131,7 @@
       "confidence": 1
     },
     {
-      "id": "service:compose/shopfront/worker",
+      "id": "container:@shopfront/worker",
       "kind": "service",
       "layer": "container",
       "name": "worker",
@@ -186,109 +151,48 @@
         }
       ],
       "confidence": 1
+    },
+    {
+      "id": "context:@shopfront/shopfront",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "shopfront",
+      "attrs": {
+        "orchestrator": "docker-compose"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 1
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "id": "context:api.stripe.com",
+      "kind": "external",
+      "layer": "context",
+      "name": "api.stripe.com",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "api.stripe.com"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 10
+        }
+      ],
+      "confidence": 0.8
     }
   ],
   "edges": [
     {
-      "id": "e:b912038d79d3",
-      "from": "boundary:compose/shopfront/shopfront",
-      "to": "datastore:compose/shopfront/cache",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "compose",
-          "path": "docker-compose.yml",
-          "line": 43,
-          "rule": "compose_project_member",
-          "detail": "service \"cache\" is declared in Compose project \"shopfront\""
-        }
-      ]
-    },
-    {
-      "id": "e:c95edaf0da7f",
-      "from": "boundary:compose/shopfront/shopfront",
-      "to": "datastore:compose/shopfront/db",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "compose",
-          "path": "docker-compose.yml",
-          "line": 35,
-          "rule": "compose_project_member",
-          "detail": "service \"db\" is declared in Compose project \"shopfront\""
-        }
-      ]
-    },
-    {
-      "id": "e:b71f9b0a9bed",
-      "from": "boundary:compose/shopfront/shopfront",
-      "to": "datastore:compose/shopfront/search",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "compose",
-          "path": "docker-compose.yml",
-          "line": 54,
-          "rule": "compose_project_member",
-          "detail": "service \"search\" is declared in Compose project \"shopfront\""
-        }
-      ]
-    },
-    {
-      "id": "e:ecabc781a4db",
-      "from": "boundary:compose/shopfront/shopfront",
-      "to": "queue:compose/shopfront/queue",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "compose",
-          "path": "docker-compose.yml",
-          "line": 48,
-          "rule": "compose_project_member",
-          "detail": "service \"queue\" is declared in Compose project \"shopfront\""
-        }
-      ]
-    },
-    {
-      "id": "e:b3461044b67e",
-      "from": "boundary:compose/shopfront/shopfront",
-      "to": "service:compose/shopfront/web",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "compose",
-          "path": "docker-compose.yml",
-          "line": 4,
-          "rule": "compose_project_member",
-          "detail": "service \"web\" is declared in Compose project \"shopfront\""
-        }
-      ]
-    },
-    {
-      "id": "e:7d6f31c3ec11",
-      "from": "boundary:compose/shopfront/shopfront",
-      "to": "service:compose/shopfront/worker",
-      "kind": "contains",
-      "confidence": 1,
-      "evidence": [
-        {
-          "extractor": "compose",
-          "path": "docker-compose.yml",
-          "line": 23,
-          "rule": "compose_project_member",
-          "detail": "service \"worker\" is declared in Compose project \"shopfront\""
-        }
-      ]
-    },
-    {
-      "id": "e:58649c7a33c2",
-      "from": "service:compose/shopfront/web",
-      "to": "datastore:compose/shopfront/cache",
+      "id": "e:ebef8764d3d1",
+      "from": "container:@shopfront/web",
+      "to": "container:@shopfront/cache",
       "kind": "persists_to",
       "protocol": "redis",
       "confidence": 1,
@@ -310,9 +214,9 @@
       ]
     },
     {
-      "id": "e:494830f1912a",
-      "from": "service:compose/shopfront/web",
-      "to": "datastore:compose/shopfront/db",
+      "id": "e:4a7482e75091",
+      "from": "container:@shopfront/web",
+      "to": "container:@shopfront/db",
       "kind": "persists_to",
       "protocol": "postgres",
       "confidence": 1,
@@ -334,9 +238,9 @@
       ]
     },
     {
-      "id": "e:40503e3c3859",
-      "from": "service:compose/shopfront/web",
-      "to": "datastore:compose/shopfront/search",
+      "id": "e:d697788fbc7a",
+      "from": "container:@shopfront/web",
+      "to": "container:@shopfront/search",
       "kind": "persists_to",
       "confidence": 0.8,
       "evidence": [
@@ -350,9 +254,9 @@
       ]
     },
     {
-      "id": "e:b7ca9ee757ab",
-      "from": "service:compose/shopfront/web",
-      "to": "external:resolver/net/api.stripe.com",
+      "id": "e:7c0c242018f8",
+      "from": "container:@shopfront/web",
+      "to": "context:api.stripe.com",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.8,
@@ -367,9 +271,9 @@
       ]
     },
     {
-      "id": "e:1d6cd79a3d63",
-      "from": "service:compose/shopfront/worker",
-      "to": "datastore:compose/shopfront/db",
+      "id": "e:0effad88e7c5",
+      "from": "container:@shopfront/worker",
+      "to": "container:@shopfront/db",
       "kind": "persists_to",
       "protocol": "postgres",
       "confidence": 1,
@@ -391,9 +295,9 @@
       ]
     },
     {
-      "id": "e:ef641af3d175",
-      "from": "service:compose/shopfront/worker",
-      "to": "queue:compose/shopfront/queue",
+      "id": "e:e16008d880d1",
+      "from": "container:@shopfront/worker",
+      "to": "container:@shopfront/queue",
       "kind": "publishes_to",
       "protocol": "amqp",
       "confidence": 1,
@@ -411,6 +315,102 @@
           "line": 26,
           "rule": "name_exact",
           "detail": "env BROKER_URL=amqp://***:***@queue:5672// (resolves to queue)"
+        }
+      ]
+    },
+    {
+      "id": "e:290cd98d6a9e",
+      "from": "context:@shopfront/shopfront",
+      "to": "container:@shopfront/cache",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 43,
+          "rule": "compose_project_member",
+          "detail": "service \"cache\" is declared in Compose project \"shopfront\""
+        }
+      ]
+    },
+    {
+      "id": "e:835b5c9a24f1",
+      "from": "context:@shopfront/shopfront",
+      "to": "container:@shopfront/db",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 35,
+          "rule": "compose_project_member",
+          "detail": "service \"db\" is declared in Compose project \"shopfront\""
+        }
+      ]
+    },
+    {
+      "id": "e:7c9b1f10ff66",
+      "from": "context:@shopfront/shopfront",
+      "to": "container:@shopfront/queue",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 48,
+          "rule": "compose_project_member",
+          "detail": "service \"queue\" is declared in Compose project \"shopfront\""
+        }
+      ]
+    },
+    {
+      "id": "e:14ea71eacc83",
+      "from": "context:@shopfront/shopfront",
+      "to": "container:@shopfront/search",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 54,
+          "rule": "compose_project_member",
+          "detail": "service \"search\" is declared in Compose project \"shopfront\""
+        }
+      ]
+    },
+    {
+      "id": "e:bcf0061b3e36",
+      "from": "context:@shopfront/shopfront",
+      "to": "container:@shopfront/web",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 4,
+          "rule": "compose_project_member",
+          "detail": "service \"web\" is declared in Compose project \"shopfront\""
+        }
+      ]
+    },
+    {
+      "id": "e:5baa6db98ebb",
+      "from": "context:@shopfront/shopfront",
+      "to": "container:@shopfront/worker",
+      "kind": "contains",
+      "confidence": 1,
+      "evidence": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 23,
+          "rule": "compose_project_member",
+          "detail": "service \"worker\" is declared in Compose project \"shopfront\""
         }
       ]
     }

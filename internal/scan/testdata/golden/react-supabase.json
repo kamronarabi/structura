@@ -1,143 +1,16 @@
 {
-  "schemaVersion": "0.3.0",
+  "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:1e9814fed52fe576b50e7b032c715e6678e4e1bba304f2138e2b3cc332c0c955",
+  "contentHash": "sha256:c50dee35be6fb9f46b6254e4b56693d1dd763396aafff4af4ab428a7e1509902",
   "root": {
     "name": "react-supabase"
   },
   "nodes": [
     {
-      "id": "external:resolver/net/api.storefront.acme.io",
-      "kind": "external",
-      "layer": "context",
-      "name": "api.storefront.acme.io",
-      "namespace": "net",
-      "attrs": {
-        "hostname": "api.storefront.acme.io"
-      },
-      "sources": [
-        {
-          "extractor": "dotenv",
-          "path": "web/.env.production",
-          "line": 3
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "external:resolver/net/apn1-crisp-mole-12345.upstash.io",
-      "kind": "external",
-      "layer": "context",
-      "name": "apn1-crisp-mole-12345.upstash.io",
-      "namespace": "net",
-      "attrs": {
-        "hostname": "apn1-crisp-mole-12345.upstash.io"
-      },
-      "sources": [
-        {
-          "extractor": "dotenv",
-          "path": "worker/.env.production",
-          "line": 2
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "external:resolver/net/db.kbqjfnwtsdplmvxr.supabase.co",
-      "kind": "external",
-      "layer": "context",
-      "name": "db.kbqjfnwtsdplmvxr.supabase.co",
-      "namespace": "net",
-      "attrs": {
-        "hostname": "db.kbqjfnwtsdplmvxr.supabase.co"
-      },
-      "sources": [
-        {
-          "extractor": "dotenv",
-          "path": "worker/.env.production",
-          "line": 1
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "external:resolver/net/kbqjfnwtsdplmvxr.supabase.co",
-      "kind": "external",
-      "layer": "context",
-      "name": "kbqjfnwtsdplmvxr.supabase.co",
-      "namespace": "net",
-      "attrs": {
-        "hostname": "kbqjfnwtsdplmvxr.supabase.co"
-      },
-      "sources": [
-        {
-          "extractor": "dotenv",
-          "path": "web/.env.production",
-          "line": 2
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "external:resolver/net/o450001.ingest.sentry.io",
-      "kind": "external",
-      "layer": "context",
-      "name": "o450001.ingest.sentry.io",
-      "namespace": "net",
-      "attrs": {
-        "hostname": "o450001.ingest.sentry.io"
-      },
-      "sources": [
-        {
-          "extractor": "dotenv",
-          "path": "web/.env.production",
-          "line": 8
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "external:resolver/net/sqs.us-east-1.amazonaws.com",
-      "kind": "external",
-      "layer": "context",
-      "name": "sqs.us-east-1.amazonaws.com",
-      "namespace": "net",
-      "attrs": {
-        "hostname": "sqs.us-east-1.amazonaws.com"
-      },
-      "sources": [
-        {
-          "extractor": "dotenv",
-          "path": "worker/.env.production",
-          "line": 3
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "external:resolver/vendor/stripe",
-      "kind": "external",
-      "layer": "context",
-      "name": "stripe",
-      "namespace": "vendor",
-      "attrs": {
-        "vendor": "stripe"
-      },
-      "sources": [
-        {
-          "extractor": "manifest",
-          "path": "web/package.json",
-          "line": 1
-        }
-      ],
-      "confidence": 0.4
-    },
-    {
-      "id": "service:manifest/javascript/web",
+      "id": "container:web",
       "kind": "service",
       "layer": "container",
       "name": "storefront-web",
-      "namespace": "javascript",
       "tech": {
         "language": "javascript",
         "framework": "nextjs"
@@ -162,11 +35,10 @@
       "confidence": 0.8
     },
     {
-      "id": "service:manifest/javascript/worker",
+      "id": "container:worker",
       "kind": "service",
       "layer": "container",
       "name": "storefront-worker",
-      "namespace": "javascript",
       "tech": {
         "language": "javascript"
       },
@@ -188,13 +60,139 @@
         }
       ],
       "confidence": 0.8
+    },
+    {
+      "id": "context:api.storefront.acme.io",
+      "kind": "external",
+      "layer": "context",
+      "name": "api.storefront.acme.io",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "api.storefront.acme.io"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "web/.env.production",
+          "line": 3
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "context:apn1-crisp-mole-12345.upstash.io",
+      "kind": "external",
+      "layer": "context",
+      "name": "apn1-crisp-mole-12345.upstash.io",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "apn1-crisp-mole-12345.upstash.io"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "worker/.env.production",
+          "line": 2
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "context:db.kbqjfnwtsdplmvxr.supabase.co",
+      "kind": "external",
+      "layer": "context",
+      "name": "db.kbqjfnwtsdplmvxr.supabase.co",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "db.kbqjfnwtsdplmvxr.supabase.co"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "worker/.env.production",
+          "line": 1
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "context:kbqjfnwtsdplmvxr.supabase.co",
+      "kind": "external",
+      "layer": "context",
+      "name": "kbqjfnwtsdplmvxr.supabase.co",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "kbqjfnwtsdplmvxr.supabase.co"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "web/.env.production",
+          "line": 2
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "context:o450001.ingest.sentry.io",
+      "kind": "external",
+      "layer": "context",
+      "name": "o450001.ingest.sentry.io",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "o450001.ingest.sentry.io"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "web/.env.production",
+          "line": 8
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "context:sqs.us-east-1.amazonaws.com",
+      "kind": "external",
+      "layer": "context",
+      "name": "sqs.us-east-1.amazonaws.com",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "sqs.us-east-1.amazonaws.com"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": "worker/.env.production",
+          "line": 3
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "context:stripe",
+      "kind": "external",
+      "layer": "context",
+      "name": "stripe",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "stripe"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "web/package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
     }
   ],
   "edges": [
     {
-      "id": "e:37d19565be65",
-      "from": "service:manifest/javascript/web",
-      "to": "external:resolver/net/api.storefront.acme.io",
+      "id": "e:0752e4966762",
+      "from": "container:web",
+      "to": "context:api.storefront.acme.io",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.8,
@@ -209,9 +207,9 @@
       ]
     },
     {
-      "id": "e:cf802edb9de3",
-      "from": "service:manifest/javascript/web",
-      "to": "external:resolver/net/kbqjfnwtsdplmvxr.supabase.co",
+      "id": "e:858baa3fdb4b",
+      "from": "container:web",
+      "to": "context:kbqjfnwtsdplmvxr.supabase.co",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.8,
@@ -233,9 +231,9 @@
       ]
     },
     {
-      "id": "e:abd9407280da",
-      "from": "service:manifest/javascript/web",
-      "to": "external:resolver/net/o450001.ingest.sentry.io",
+      "id": "e:fa40db33f7e4",
+      "from": "container:web",
+      "to": "context:o450001.ingest.sentry.io",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.8,
@@ -250,9 +248,9 @@
       ]
     },
     {
-      "id": "e:4cb8dfa94823",
-      "from": "service:manifest/javascript/web",
-      "to": "external:resolver/vendor/stripe",
+      "id": "e:3dbd3adc9f55",
+      "from": "container:web",
+      "to": "context:stripe",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.4,
@@ -267,9 +265,9 @@
       ]
     },
     {
-      "id": "e:2343a4b4d5f3",
-      "from": "service:manifest/javascript/worker",
-      "to": "external:resolver/net/apn1-crisp-mole-12345.upstash.io",
+      "id": "e:db032cbb858e",
+      "from": "container:worker",
+      "to": "context:apn1-crisp-mole-12345.upstash.io",
       "kind": "persists_to",
       "protocol": "redis",
       "confidence": 0.8,
@@ -284,9 +282,9 @@
       ]
     },
     {
-      "id": "e:cb4c280026c5",
-      "from": "service:manifest/javascript/worker",
-      "to": "external:resolver/net/db.kbqjfnwtsdplmvxr.supabase.co",
+      "id": "e:17c0edbd5731",
+      "from": "container:worker",
+      "to": "context:db.kbqjfnwtsdplmvxr.supabase.co",
       "kind": "persists_to",
       "protocol": "postgres",
       "confidence": 0.8,
@@ -301,9 +299,9 @@
       ]
     },
     {
-      "id": "e:e38a1d46d524",
-      "from": "service:manifest/javascript/worker",
-      "to": "external:resolver/net/sqs.us-east-1.amazonaws.com",
+      "id": "e:c9656ec2b52c",
+      "from": "container:worker",
+      "to": "context:sqs.us-east-1.amazonaws.com",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.8,

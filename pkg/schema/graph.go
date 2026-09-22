@@ -85,10 +85,11 @@ type VCS struct {
 // Node is one element of the architecture: a service, a datastore, a queue, a
 // third-party system, a cloud resource, a package, or a grouping boundary.
 type Node struct {
-	// ID is semantic, not a content hash: "kind:source/namespace/name".
+	// ID is semantic, not a content hash: "layer:name" or "layer:@scope/name".
 	// A content hash would change when a file moves, turning every drift
 	// diff into a false positive, and IDs appear verbatim in LLM answers, so
-	// they need to stay readable.
+	// they need to stay readable. It is derived from the identity fields
+	// below; see ids.go for why only those are in it.
 	ID   string   `json:"id"`
 	Kind NodeKind `json:"kind"`
 
@@ -96,8 +97,23 @@ type Node struct {
 	// field exists now so Phase 2 can add component without a schema break.
 	Layer Layer `json:"layer"`
 
-	Name      string `json:"name"`
+	Name string `json:"name"`
+
+	// Namespace is the deployment scope the component lives in: a Kubernetes
+	// namespace, and nothing else. It is empty for the many components whose
+	// repository declares no scope for them.
+	//
+	// It once held whatever each extractor had to hand -- a chart name, a
+	// Compose project, a Terraform module directory, a language -- because it
+	// was the identifier's only disambiguating segment. Those are recorded
+	// where they belong now, and this means one thing.
 	Namespace string `json:"namespace,omitempty"`
+
+	// Project is the declared project this component belongs to, empty when
+	// the repository is a single project, which is the usual case. It is part
+	// of identity, which is why it is a field and not an attribute: two
+	// projects each declaring a "prod" namespace are not one namespace.
+	Project string `json:"project,omitempty"`
 
 	Tech    *Tech    `json:"tech,omitempty"`
 	Attrs   Attrs    `json:"attrs,omitempty"`

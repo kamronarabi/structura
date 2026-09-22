@@ -52,6 +52,7 @@ sock-shop
 
   diagnostics
     info helm_values_inferred          1
+    info node_kind_conflict            3
     info terraform_unexpanded          3
     info terraform_unrecognized_resource 1
     info unmatched_service_selector    8

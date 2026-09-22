@@ -37,6 +37,28 @@ var nodeKinds = map[NodeKind]bool{
 // Valid reports whether k is a known node kind.
 func (k NodeKind) Valid() bool { return nodeKinds[k] }
 
+// LayerOf is the C4 level a kind belongs to.
+//
+// It is the only part of a node's classification that appears in its
+// identifier, and it is there because it is the one part that does not move.
+// A kind is inferred -- carts-db is a datastore where a Compose file named its
+// image and a service where a sibling file did not -- and an identifier built
+// on an inference splits one component in two the moment the evidence differs.
+// Both of those readings are container level, so the layer holds.
+//
+// What it does distinguish is a container from the thing that contains it. A
+// Helm chart called podinfo deploys a workload called podinfo, and a namespace
+// called sock-shop holds a service called sock-shop. Those are two nodes with
+// one name, and the layer is what says so.
+func LayerOf(kind NodeKind) Layer {
+	switch kind {
+	case KindBoundary, KindExternal:
+		return LayerContext
+	default:
+		return LayerContainer
+	}
+}
+
 // Layer is the C4 level a node belongs to.
 type Layer string
 

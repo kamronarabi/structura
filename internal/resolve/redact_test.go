@@ -186,8 +186,8 @@ func TestIsSecretKey(t *testing.T) {
 // "nothing is serialized without passing through redaction".
 func TestRedactGraphCoversEverySerializedString(t *testing.T) {
 	b := schema.NewBuilder()
-	from := schema.NewNodeID(schema.KindService, "compose", "app", "web")
-	to := schema.NewNodeID(schema.KindDatastore, "compose", "app", "db")
+	from := schema.NewNodeID(schema.KindService, "app", "web")
+	to := schema.NewNodeID(schema.KindDatastore, "app", "db")
 
 	b.AddNode(schema.Node{
 		ID: from, Kind: schema.KindService, Layer: schema.LayerContainer,

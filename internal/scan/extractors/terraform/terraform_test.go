@@ -635,8 +635,11 @@ module "security_group" {
 		if found.Layer != schema.LayerContainer {
 			t.Errorf("module %q is at layer %s, want container", name, found.Layer)
 		}
-		if !strings.HasPrefix(found.ID, string(schema.KindCloudResource)+":") {
-			t.Errorf("module %q has id %s, which disagrees with its kind", name, found.ID)
+		// The identifier carries the layer, not the kind. What it has to
+		// agree with is the Layer field, since both come from LayerOf.
+		if !strings.HasPrefix(found.ID, string(found.Layer)+":") {
+			t.Errorf("module %q has id %s, which disagrees with its layer %s",
+				name, found.ID, found.Layer)
 		}
 	}
 

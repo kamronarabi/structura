@@ -108,19 +108,11 @@ func (e *Extractor) Extract(_ context.Context, f *scan.File, emit scan.Emitter) 
 	language, _ := languageOf(stages)
 	kind, tech := runtimeOf(base)
 
-	// The namespace exists to keep two components with the same name apart,
-	// and for a codebase the thing that does that is what it is written in.
-	// A base image that names no language leaves "container", which is still
-	// true: this is a thing that builds into one.
-	namespace := language
-	if namespace == "" {
-		namespace = "container"
-	}
 	idPath := dir
 	if idPath == "." {
 		idPath = "root"
 	}
-	id := schema.NewNodeID(kind, Name, namespace, idPath)
+	id := schema.NewNodeID(kind, "", idPath)
 
 	attrs := schema.Attrs{
 		"dockerfile": f.Name,
@@ -142,14 +134,13 @@ func (e *Extractor) Extract(_ context.Context, f *scan.File, emit scan.Emitter) 
 	}
 
 	emit.Node(schema.Node{
-		ID:        id,
-		Kind:      kind,
-		Layer:     schema.LayerContainer,
-		Name:      componentName(dir),
-		Namespace: namespace,
-		Tech:      techOf(language, tech),
-		Attrs:     attrs,
-		Sources:   []schema.Source{{Extractor: Name, Path: f.Path, Line: stages[0].line}},
+		ID:      id,
+		Kind:    kind,
+		Layer:   schema.LayerContainer,
+		Name:    componentName(dir),
+		Tech:    techOf(language, tech),
+		Attrs:   attrs,
+		Sources: []schema.Source{{Extractor: Name, Path: f.Path, Line: stages[0].line}},
 		// A Dockerfile proves something builds here, not that it is deployed
 		// as its own service. An infrastructure file saying so raises this,
 		// through the merge.
@@ -167,7 +158,6 @@ func (e *Extractor) Extract(_ context.Context, f *scan.File, emit scan.Emitter) 
 	if dirBase != "" && dirBase != "." && dirBase != "/" && !genericDirs[strings.ToLower(dirBase)] {
 		emit.Alias(resolve.Alias{
 			Name:       dirBase,
-			Namespace:  namespace,
 			DNS:        []string{dirBase},
 			TargetName: componentName(dir),
 			Source: schema.Evidence{

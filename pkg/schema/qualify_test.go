@@ -8,27 +8,27 @@ import (
 	"github.com/kamronarabi/structura/pkg/schema"
 )
 
-func boundaryID(t *testing.T, namespace, name string) string {
+func boundaryID(t *testing.T, scope, name string) string {
 	t.Helper()
-	return schema.NewNodeID(schema.KindBoundary, "k8s", namespace, name)
+	return schema.NewNodeID(schema.KindBoundary, scope, name)
 }
 
-func TestQualifyNamespace(t *testing.T) {
+func TestQualifyProject(t *testing.T) {
 	id := boundaryID(t, "prod", "prod")
 
 	t.Run("no prefix leaves the id alone", func(t *testing.T) {
-		got, err := schema.QualifyNamespace(id, "")
+		got, err := schema.QualifyProject(id, "")
 		if err != nil || got != id {
-			t.Errorf("QualifyNamespace(%q, \"\") = (%q, %v), want it unchanged", id, got, err)
+			t.Errorf("QualifyProject(%q, \"\") = (%q, %v), want it unchanged", id, got, err)
 		}
 	})
 
 	t.Run("the prefix separates two projects sharing a namespace", func(t *testing.T) {
-		a, err := schema.QualifyNamespace(id, "web")
+		a, err := schema.QualifyProject(id, "web")
 		if err != nil {
 			t.Fatal(err)
 		}
-		b, err := schema.QualifyNamespace(id, "billing")
+		b, err := schema.QualifyProject(id, "billing")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -39,7 +39,7 @@ func TestQualifyNamespace(t *testing.T) {
 		// accepts, which means surviving re-normalization unchanged.
 		for _, got := range []string{a, b} {
 			if err := schema.ValidateNodeID(got); err != nil {
-				t.Errorf("QualifyNamespace produced an invalid id %q: %v", got, err)
+				t.Errorf("QualifyProject produced an invalid id %q: %v", got, err)
 			}
 		}
 	})
@@ -47,9 +47,9 @@ func TestQualifyNamespace(t *testing.T) {
 	t.Run("the name is preserved exactly", func(t *testing.T) {
 		// A name may already carry a discriminator from its own folding, and
 		// rebuilding it would fold it twice.
-		orig := schema.NewNodeID(schema.KindService, "k8s", "prod", "Ünïcödé Service")
+		orig := schema.NewNodeID(schema.KindService, "prod", "Ünïcödé Service")
 		name := orig[strings.LastIndex(orig, "/")+1:]
-		got, err := schema.QualifyNamespace(orig, "web")
+		got, err := schema.QualifyProject(orig, "web")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -58,30 +58,43 @@ func TestQualifyNamespace(t *testing.T) {
 		}
 	})
 
+	t.Run("a node with no scope gains one, which is the project", func(t *testing.T) {
+		plain := schema.NewNodeID(schema.KindService, "", "api")
+		got, err := schema.QualifyProject(plain, "billing")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "container:@billing/api" {
+			t.Errorf("QualifyProject(%q, \"billing\") = %q, want container:@billing/api", plain, got)
+		}
+		if err := schema.ValidateNodeID(got); err != nil {
+			t.Errorf("%q is invalid: %v", got, err)
+		}
+	})
+
 	t.Run("a prefix that folds to nothing still yields a valid id", func(t *testing.T) {
-		got, err := schema.QualifyNamespace(id, "!!!")
+		got, err := schema.QualifyProject(id, "!!!")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err := schema.ValidateNodeID(got); err != nil {
-			t.Errorf("QualifyNamespace(%q, \"!!!\") = %q, which is invalid: %v", id, got, err)
+			t.Errorf("QualifyProject(%q, \"!!!\") = %q, which is invalid: %v", id, got, err)
 		}
 	})
 }
 
-func TestQualifyNamespaceRejectsMalformedIDs(t *testing.T) {
+func TestQualifyProjectRejectsMalformedIDs(t *testing.T) {
 	for _, tt := range []struct{ name, id string }{
-		{"no kind", "k8s/prod/web"},
-		{"no namespace", "boundary:k8s"},
-		{"no name", "boundary:k8s/prod"},
-		{"empty namespace", "boundary:k8s//web"},
-		{"empty name", "boundary:k8s/prod/"},
+		{"no layer", "prod/web"},
+		{"no name after a scope", "context:@prod"},
+		{"empty scope", "context:@/web"},
+		{"empty name", "context:@prod/"},
 		{"empty id", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := schema.QualifyNamespace(tt.id, "web")
+			got, err := schema.QualifyProject(tt.id, "web")
 			if err == nil {
-				t.Fatalf("QualifyNamespace(%q) = (%q, nil), want an error", tt.id, got)
+				t.Fatalf("QualifyProject(%q) = (%q, nil), want an error", tt.id, got)
 			}
 			if !errors.Is(err, schema.ErrInvalidNodeID) {
 				t.Errorf("error = %v, want one wrapping ErrInvalidNodeID so callers can tell it apart", err)
@@ -99,12 +112,12 @@ func TestQualifyNamespaceRejectsMalformedIDs(t *testing.T) {
 // assertion. This one holds the reason that pass has to exist. If it ever
 // starts failing, this function grew a defence of its own and the caller
 // should be re-examined rather than left doing work twice.
-func TestQualifyNamespaceCollision(t *testing.T) {
-	a, err := schema.QualifyNamespace(boundaryID(t, "prod", "ns"), "web-api")
+func TestQualifyProjectCollision(t *testing.T) {
+	a, err := schema.QualifyProject(boundaryID(t, "prod", "ns"), "web-api")
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := schema.QualifyNamespace(boundaryID(t, "api-prod", "ns"), "web")
+	b, err := schema.QualifyProject(boundaryID(t, "api-prod", "ns"), "web")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -61,23 +61,6 @@ type Identity struct {
 	Project string
 }
 
-// codeExtractors are the extractors whose namespace holds a language rather
-// than a deployment boundary, because a file describing a codebase genuinely
-// does not know what deploys it. A manifest writes the language there; a
-// Dockerfile writes the language its base image runs, or "container" when the
-// base names none.
-//
-// The names are spelled out rather than imported because the extractors depend
-// on this package, not the other way round.
-var codeExtractors = map[string]bool{
-	"manifest":   true,
-	"dockerfile": true,
-}
-
-// scopeFromNamespace reports whether an extractor's namespace names a
-// deployment boundary.
-func scopeFromNamespace(extractor string) bool { return !codeExtractors[extractor] }
-
 // Index maps every known identity form to the nodes that claim it.
 //
 // A form can be claimed by more than one node, and that is the interesting
@@ -123,18 +106,16 @@ func identityOf(n schema.Node) *Identity {
 		Labels:    map[string]string{},
 	}
 
+	// Identity comes from the node's fields. It used to be recovered by
+	// parsing the identifier, which meant the identifier had to carry it --
+	// and that is what put the extractor and the inferred kind in there. The
+	// scope is now simply the scope.
+	id.Scope = n.Namespace
+
 	// The last segment of the node ID is a normalized form of the name, and
 	// is sometimes the only clean identifier a node has.
 	if parsed, err := schema.ParseNodeID(n.ID); err == nil {
 		id.Names = append(id.Names, lastSegment(parsed.Name))
-		if id.Namespace == "" {
-			id.Namespace = parsed.Namespace
-		}
-		if scopeFromNamespace(parsed.Source) {
-			id.Scope = id.Namespace
-		}
-	} else {
-		id.Scope = id.Namespace
 	}
 
 	for _, key := range []string{"name", "address", "terraformModule"} {
@@ -161,8 +142,8 @@ func identityOf(n schema.Node) *Identity {
 	if dir, ok := n.Attrs["directory"].(string); ok {
 		id.Directory = dir
 	}
-	if proj, ok := n.Attrs["project"].(string); ok && proj != "" {
-		id.Project = proj
+	if n.Project != "" {
+		id.Project = n.Project
 	} else {
 		id.Project = "."
 	}

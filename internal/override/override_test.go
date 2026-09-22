@@ -26,14 +26,14 @@ func edge(from, to string, kind schema.EdgeKind, confidence float64, rule string
 // fixture: web -> api (calls), api -> stripe (calls). No edge to cache.
 func fixture() ([]schema.Node, []schema.Edge) {
 	nodes := []schema.Node{
-		node("service:compose/shop/web", schema.KindService, "web", "shop"),
-		node("service:compose/shop/api", schema.KindService, "api", "shop"),
-		node("datastore:compose/shop/cache", schema.KindDatastore, "cache", "shop"),
-		node("external:resolver/net/api.stripe.com", schema.KindExternal, "api.stripe.com", "net"),
+		node("container:@shop/web", schema.KindService, "web", "shop"),
+		node("container:@shop/api", schema.KindService, "api", "shop"),
+		node("container:@shop/cache", schema.KindDatastore, "cache", "shop"),
+		node("context:api.stripe.com", schema.KindExternal, "api.stripe.com", "net"),
 	}
 	edges := []schema.Edge{
-		edge("service:compose/shop/web", "service:compose/shop/api", schema.EdgeCalls, 0.8, "name_exact"),
-		edge("service:compose/shop/api", "external:resolver/net/api.stripe.com", schema.EdgeCalls, 0.8, "external_host"),
+		edge("container:@shop/web", "container:@shop/api", schema.EdgeCalls, 0.8, "name_exact"),
+		edge("container:@shop/api", "context:api.stripe.com", schema.EdgeCalls, 0.8, "external_host"),
 	}
 	return nodes, edges
 }
@@ -205,7 +205,7 @@ func TestReferenceThatMatchesNothingIsReported(t *testing.T) {
 // edge nobody can see. It is refused, and the candidates are named.
 func TestAmbiguousReferenceIsRefused(t *testing.T) {
 	nodes, edges := fixture()
-	nodes = append(nodes, node("service:k8s/prod/api", schema.KindService, "api", "prod"))
+	nodes = append(nodes, node("container:@prod/api", schema.KindService, "api", "prod"))
 
 	_, diags := override.Apply(nodes, edges, override.Rules{
 		Relationships: []override.Relationship{{From: "api", To: "cache"}},
@@ -224,9 +224,9 @@ func TestAmbiguousReferenceIsRefused(t *testing.T) {
 // A namespace-qualified name disambiguates, and so does a full id.
 func TestQualifiedAndFullReferencesResolve(t *testing.T) {
 	nodes, edges := fixture()
-	nodes = append(nodes, node("service:k8s/prod/api", schema.KindService, "api", "prod"))
+	nodes = append(nodes, node("container:@prod/api", schema.KindService, "api", "prod"))
 
-	for _, ref := range []string{"api.shop", "service:compose/shop/api"} {
+	for _, ref := range []string{"api.shop", "container:@shop/api"} {
 		res, diags := override.Apply(nodes, edges, override.Rules{
 			Relationships: []override.Relationship{{From: ref, To: "cache"}},
 		})
@@ -280,9 +280,9 @@ func TestDeclaringAnInferredRelationshipUpgradesIt(t *testing.T) {
 // nested-project case the basename join deliberately refuses.
 func TestMergingTwoComponents(t *testing.T) {
 	nodes, edges := fixture()
-	nodes = append(nodes, node("service:manifest/go/api", schema.KindService, "acme/api", "go"))
+	nodes = append(nodes, node("container:@go/api", schema.KindService, "acme/api", "go"))
 	edges = append(edges,
-		edge("service:manifest/go/api", "datastore:compose/shop/cache", schema.EdgePersistsTo, 0.8, "library"))
+		edge("container:@go/api", "container:@shop/cache", schema.EdgePersistsTo, 0.8, "library"))
 
 	res, diags := override.Apply(nodes, edges, override.Rules{
 		Components: []override.Component{{Same: []string{"api.shop", "acme/api"}}},
@@ -312,9 +312,9 @@ func TestMergingTwoComponents(t *testing.T) {
 // node to itself, which is not a relationship.
 func TestMergingDropsTheEdgeBetweenTheHalves(t *testing.T) {
 	nodes, edges := fixture()
-	nodes = append(nodes, node("service:manifest/go/api", schema.KindService, "acme/api", "go"))
+	nodes = append(nodes, node("container:@go/api", schema.KindService, "acme/api", "go"))
 	edges = append(edges,
-		edge("service:compose/shop/api", "service:manifest/go/api", schema.EdgeDependsOn, 0.7, "image"))
+		edge("container:@shop/api", "container:@go/api", schema.EdgeDependsOn, 0.7, "image"))
 
 	res, _ := override.Apply(nodes, edges, override.Rules{
 		Components: []override.Component{{Same: []string{"api.shop", "acme/api"}}},
@@ -354,7 +354,7 @@ func TestNoRulesChangesNothing(t *testing.T) {
 // relationship should land on the node that survived.
 func TestRelationshipAfterAMergeLandsOnTheSurvivor(t *testing.T) {
 	nodes, edges := fixture()
-	nodes = append(nodes, node("service:manifest/go/api", schema.KindService, "acme/api", "go"))
+	nodes = append(nodes, node("container:@go/api", schema.KindService, "acme/api", "go"))
 
 	res, diags := override.Apply(nodes, edges, override.Rules{
 		Components: []override.Component{{Same: []string{"api.shop", "acme/api"}}},

@@ -187,13 +187,13 @@ func TestListNodesAndDescribeRoundTrip(t *testing.T) {
 	var id string
 	for _, line := range strings.Split(list, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "service:") {
+		if strings.HasPrefix(trimmed, "container:") {
 			id = strings.Fields(trimmed)[0]
 			break
 		}
 	}
 	if id == "" {
-		t.Fatalf("no service id in the listing:\n%s", list)
+		t.Fatalf("no component id in the listing:\n%s", list)
 	}
 
 	desc, isErr := callText(t, session, ctx, "structura_describe_node",
@@ -216,7 +216,7 @@ func TestDescribeNodeAcceptsAName(t *testing.T) {
 	var name string
 	for _, line := range strings.Split(list, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "service:") {
+		if strings.HasPrefix(trimmed, "container:") {
 			id := strings.Fields(trimmed)[0]
 			name = id[strings.LastIndex(id, "/")+1:]
 			break

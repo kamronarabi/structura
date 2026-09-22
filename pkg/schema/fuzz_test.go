@@ -35,24 +35,47 @@ func FuzzNodeID(f *testing.F) {
 		schema.KindBoundary,
 	}
 
-	f.Fuzz(func(t *testing.T, source, namespace, name string) {
+	f.Fuzz(func(t *testing.T, project, scope, name string) {
 		for _, kind := range kinds {
-			id := schema.NewNodeID(kind, source, namespace, name)
+			id := schema.NewNodeID(kind, scope, name)
 
 			if err := schema.ValidateNodeID(id); err != nil {
-				t.Fatalf("NewNodeID(%q, %q, %q, %q) = %q, which does not validate: %v",
-					kind, source, namespace, name, id, err)
+				t.Fatalf("NewNodeID(%q, %q, %q) = %q, which does not validate: %v",
+					kind, scope, name, id, err)
 			}
 			parsed, err := schema.ParseNodeID(id)
 			if err != nil {
 				t.Fatalf("ParseNodeID(%q) = %v", id, err)
 			}
-			if parsed.Kind != kind {
-				t.Fatalf("kind round-tripped as %q, want %q", parsed.Kind, kind)
+			// The layer is what the identifier carries, and every kind that
+			// maps to one layer has to produce one identifier -- that is what
+			// lets two readings of a component merge.
+			if parsed.Layer != schema.LayerOf(kind) {
+				t.Fatalf("layer round-tripped as %q, want %q", parsed.Layer, schema.LayerOf(kind))
 			}
-			again := schema.NewNodeID(parsed.Kind, parsed.Source, parsed.Namespace, parsed.Name)
+			again := schema.NewNodeID(kind, parsed.Scope, parsed.Name)
 			if again != id {
 				t.Fatalf("not a fixed point: %q -> %q", id, again)
+			}
+
+			// A scope, however mangled, must stay distinguishable from a name
+			// that merely contains slashes.
+			if strings.TrimSpace(scope) != "" && !strings.Contains(id, ":@") {
+				t.Fatalf("NewNodeID(%q, %q, %q) = %q dropped the scope marker", kind, scope, name, id)
+			}
+
+			// Qualifying by project must survive validation, since every
+			// multi-project repository's identifiers go through it.
+			qualified, err := schema.QualifyProject(id, project)
+			if err != nil {
+				if strings.TrimSpace(project) == "" {
+					t.Fatalf("QualifyProject(%q, %q) = %v", id, project, err)
+				}
+				return
+			}
+			if err := schema.ValidateNodeID(qualified); err != nil {
+				t.Fatalf("QualifyProject(%q, %q) = %q, which does not validate: %v",
+					id, project, qualified, err)
 			}
 		}
 	})
@@ -67,8 +90,8 @@ func FuzzGraphRoundTrip(f *testing.F) {
 	f.Add("x", "y", "z", 1e308)
 
 	f.Fuzz(func(t *testing.T, fromName, toName, path string, confidence float64) {
-		from := schema.NewNodeID(schema.KindService, "fuzz", "ns", fromName)
-		to := schema.NewNodeID(schema.KindDatastore, "fuzz", "ns", toName)
+		from := schema.NewNodeID(schema.KindService, "ns", fromName)
+		to := schema.NewNodeID(schema.KindDatastore, "ns", toName)
 
 		b := schema.NewBuilder()
 		b.AddNode(schema.Node{

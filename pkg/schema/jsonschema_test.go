@@ -187,7 +187,7 @@ func TestSchemaRejectsInvalidGraphs(t *testing.T) {
 		{
 			name: "confidence above one",
 			graph: `{"schemaVersion":"0.1.0","generatedAt":"2026-01-01T00:00:00Z","contentHash":"",
-			  "root":{"name":"x"},"nodes":[{"id":"service:a/b/c","kind":"service","layer":"container",
+			  "root":{"name":"x"},"nodes":[{"id":"container:@b/c","kind":"service","layer":"container",
 			  "name":"c","confidence":4}],"edges":[],"diagnostics":[],
 			  "stats":{"filesScanned":0,"filesParsed":0,"nodeCount":1,"edgeCount":0,"durationMs":0}}`,
 		},

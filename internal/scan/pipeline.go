@@ -387,27 +387,24 @@ func qualifyByProject(outputs []FileOutput, projects *project.Set) []schema.Diag
 
 		for j := range out.Nodes {
 			n := &out.Nodes[j]
-			if id, err := schema.QualifyNamespace(n.ID, label); err == nil {
+			if id, err := schema.QualifyProject(n.ID, label); err == nil {
 				n.ID = id
 			}
-			if n.Attrs == nil {
-				n.Attrs = schema.Attrs{}
-			}
-			n.Attrs["project"] = root
+			n.Project = root
 		}
 		for j := range out.Edges {
 			e := &out.Edges[j]
-			if id, err := schema.QualifyNamespace(e.From, label); err == nil {
+			if id, err := schema.QualifyProject(e.From, label); err == nil {
 				e.From = id
 			}
-			if id, err := schema.QualifyNamespace(e.To, label); err == nil {
+			if id, err := schema.QualifyProject(e.To, label); err == nil {
 				e.To = id
 			}
 		}
 		for j := range out.Hints {
 			h := &out.Hints[j]
 			if h.FromNode != "" {
-				if id, err := schema.QualifyNamespace(h.FromNode, label); err == nil {
+				if id, err := schema.QualifyProject(h.FromNode, label); err == nil {
 					h.FromNode = id
 				}
 			}
@@ -415,7 +412,7 @@ func qualifyByProject(outputs []FileOutput, projects *project.Set) []schema.Diag
 			// be qualified the same way or the pod and the ConfigMap stop
 			// meeting.
 			if strings.HasPrefix(h.Raw, "configmap:") {
-				if id, err := schema.QualifyNamespace(h.Raw, label); err == nil {
+				if id, err := schema.QualifyProject(h.Raw, label); err == nil {
 					h.Raw = id
 				}
 			}
@@ -498,7 +495,7 @@ func projectNamespaces(outputs []FileOutput, projects *project.Set) map[string]m
 			if out[root] == nil {
 				out[root] = map[string]bool{}
 			}
-			out[root][parsed.Namespace] = true
+			out[root][parsed.Scope] = true
 		}
 	}
 	return out
@@ -507,7 +504,7 @@ func projectNamespaces(outputs []FileOutput, projects *project.Set) map[string]m
 // foldsCollide reports whether two different projects' namespaces fold to one
 // qualified segment under the given labels.
 //
-// The fold is performed by QualifyNamespace itself, on a throwaway identifier,
+// The fold is performed by QualifyProject itself, on a throwaway identifier,
 // so this cannot drift from the rule it is checking.
 func foldsCollide(namespaces map[string]map[string]bool, labels map[string]string) bool {
 	owner := map[string]string{}
@@ -517,8 +514,8 @@ func foldsCollide(namespaces map[string]map[string]bool, labels map[string]strin
 			continue
 		}
 		for ns := range set {
-			probe, err := schema.QualifyNamespace(
-				schema.NewNodeID(schema.KindBoundary, "probe", ns, "probe"), label)
+			probe, err := schema.QualifyProject(
+				schema.NewNodeID(schema.KindBoundary, ns, "probe"), label)
 			if err != nil {
 				continue
 			}

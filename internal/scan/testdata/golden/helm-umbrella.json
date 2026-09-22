@@ -1,60 +1,13 @@
 {
-  "schemaVersion": "0.3.0",
+  "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:03b43b7fc795d554ea1465027186f000e025a864285e992cce0d2eefb7b0502c",
+  "contentHash": "sha256:19fa1e9e18d715b72f5cf977b4d78b5803cbf828cb92ff1f081e53a0ae712f86",
   "root": {
     "name": "helm-umbrella"
   },
   "nodes": [
     {
-      "id": "boundary:helm/shop/shop",
-      "kind": "boundary",
-      "layer": "context",
-      "name": "shop",
-      "namespace": "shop",
-      "attrs": {
-        "appVersion": "2.1.0",
-        "chartVersion": "1.4.0",
-        "packaging": "helm"
-      },
-      "sources": [
-        {
-          "extractor": "helm",
-          "path": "charts/shop/Chart.yaml",
-          "line": 2
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "id": "datastore:helm/shop/shop-cache",
-      "kind": "datastore",
-      "layer": "container",
-      "name": "shop-cache",
-      "namespace": "shop",
-      "tech": {
-        "runtime": "kubernetes",
-        "framework": "redis"
-      },
-      "attrs": {
-        "image": "redis:7.2",
-        "packaging": "helm",
-        "ports": [
-          6379
-        ],
-        "valuesKey": "cache"
-      },
-      "sources": [
-        {
-          "extractor": "helm",
-          "path": "charts/shop/values.yaml",
-          "line": 37
-        }
-      ],
-      "confidence": 0.4
-    },
-    {
-      "id": "service:helm/shop/cart-api",
+      "id": "container:@shop/cart-api",
       "kind": "service",
       "layer": "container",
       "name": "cart-api",
@@ -80,7 +33,7 @@
       "confidence": 0.4
     },
     {
-      "id": "service:helm/shop/jaeger",
+      "id": "container:@shop/jaeger",
       "kind": "service",
       "layer": "container",
       "name": "jaeger",
@@ -107,7 +60,34 @@
       "confidence": 0.4
     },
     {
-      "id": "service:helm/shop/storefront",
+      "id": "container:@shop/shop-cache",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "shop-cache",
+      "namespace": "shop",
+      "tech": {
+        "runtime": "kubernetes",
+        "framework": "redis"
+      },
+      "attrs": {
+        "image": "redis:7.2",
+        "packaging": "helm",
+        "ports": [
+          6379
+        ],
+        "valuesKey": "cache"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/shop/values.yaml",
+          "line": 37
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "container:@shop/storefront",
       "kind": "service",
       "layer": "container",
       "name": "storefront",
@@ -131,30 +111,33 @@
         }
       ],
       "confidence": 0.4
+    },
+    {
+      "id": "context:@shop/shop",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "shop",
+      "namespace": "shop",
+      "attrs": {
+        "appVersion": "2.1.0",
+        "chartVersion": "1.4.0",
+        "packaging": "helm"
+      },
+      "sources": [
+        {
+          "extractor": "helm",
+          "path": "charts/shop/Chart.yaml",
+          "line": 2
+        }
+      ],
+      "confidence": 1
     }
   ],
   "edges": [
     {
-      "id": "e:6865d5e72144",
-      "from": "service:helm/shop/storefront",
-      "to": "datastore:helm/shop/shop-cache",
-      "kind": "persists_to",
-      "protocol": "redis",
-      "confidence": 0.8,
-      "evidence": [
-        {
-          "extractor": "helm",
-          "path": "charts/shop/values.yaml",
-          "line": 21,
-          "rule": "name_exact",
-          "detail": "values storefront.env.SESSION_REDIS_URL=redis://shop-cache:6379/0 (resolves to shop-cache)"
-        }
-      ]
-    },
-    {
-      "id": "e:e667e343eb41",
-      "from": "service:helm/shop/storefront",
-      "to": "service:helm/shop/cart-api",
+      "id": "e:f3e778e6217a",
+      "from": "container:@shop/storefront",
+      "to": "container:@shop/cart-api",
       "kind": "calls",
       "protocol": "http",
       "confidence": 0.8,
@@ -165,6 +148,23 @@
           "line": 20,
           "rule": "name_exact",
           "detail": "values storefront.env.CART_API_URL=http://cart-api:9090 (resolves to cart-api)"
+        }
+      ]
+    },
+    {
+      "id": "e:f51ee4c63c7c",
+      "from": "container:@shop/storefront",
+      "to": "container:@shop/shop-cache",
+      "kind": "persists_to",
+      "protocol": "redis",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "helm",
+          "path": "charts/shop/values.yaml",
+          "line": 21,
+          "rule": "name_exact",
+          "detail": "values storefront.env.SESSION_REDIS_URL=redis://shop-cache:6379/0 (resolves to shop-cache)"
         }
       ]
     }

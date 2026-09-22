@@ -16,7 +16,7 @@ func sampleGraph(t *testing.T) schema.Graph {
 	t.Helper()
 	b := schema.NewBuilder()
 	b.AddNode(schema.Node{
-		ID:   schema.NewNodeID(schema.KindService, "compose", "app", "web"),
+		ID:   schema.NewNodeID(schema.KindService, "app", "web"),
 		Kind: schema.KindService, Layer: schema.LayerContainer,
 		Name: "web", Confidence: 1,
 	})

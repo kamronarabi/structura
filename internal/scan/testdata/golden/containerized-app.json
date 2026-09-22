@@ -1,174 +1,16 @@
 {
-  "schemaVersion": "0.3.0",
+  "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:58bb41ec578368c40fcd40dc0694a0d5d1220a3e0430ed5d2fe5a2549b53c09e",
+  "contentHash": "sha256:4d93c868f3b91b095ef75341a0368009e92fb9d19906e1a8bdd49adbfcc51e4b",
   "root": {
     "name": "containerized-app"
   },
   "nodes": [
     {
-      "id": "datastore:dockerfile/container/cache",
-      "kind": "datastore",
-      "layer": "container",
-      "name": "cache",
-      "namespace": "container",
-      "tech": {
-        "framework": "redis"
-      },
-      "attrs": {
-        "baseImage": "redis:7-alpine",
-        "directory": "cache",
-        "dockerfile": "Dockerfile",
-        "nameFrom": "directory",
-        "ports": [
-          6379
-        ]
-      },
-      "sources": [
-        {
-          "extractor": "dockerfile",
-          "path": "cache/Dockerfile",
-          "line": 1
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "datastore:dockerfile/container/orders-db",
-      "kind": "datastore",
-      "layer": "container",
-      "name": "orders-db",
-      "namespace": "container",
-      "tech": {
-        "framework": "postgresql"
-      },
-      "attrs": {
-        "baseImage": "postgres:16-alpine",
-        "directory": "orders-db",
-        "dockerfile": "Dockerfile",
-        "nameFrom": "directory",
-        "ports": [
-          5432
-        ]
-      },
-      "sources": [
-        {
-          "extractor": "dockerfile",
-          "path": "orders-db/Dockerfile",
-          "line": 2
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "external:resolver/vendor/stripe",
-      "kind": "external",
-      "layer": "context",
-      "name": "stripe",
-      "namespace": "vendor",
-      "attrs": {
-        "vendor": "stripe"
-      },
-      "sources": [
-        {
-          "extractor": "manifest",
-          "path": "api/go.mod",
-          "line": 1
-        }
-      ],
-      "confidence": 0.4
-    },
-    {
-      "id": "service:dockerfile/go/tools/migrator/docker",
-      "kind": "service",
-      "layer": "container",
-      "name": "migrator",
-      "namespace": "go",
-      "tech": {
-        "language": "go"
-      },
-      "attrs": {
-        "baseImage": "golang:1.22-alpine",
-        "directory": "tools/migrator/docker",
-        "dockerfile": "Dockerfile",
-        "nameFrom": "directory"
-      },
-      "sources": [
-        {
-          "extractor": "dockerfile",
-          "path": "tools/migrator/docker/Dockerfile",
-          "line": 3
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "service:dockerfile/javascript/web",
-      "kind": "service",
-      "layer": "container",
-      "name": "web",
-      "namespace": "javascript",
-      "tech": {
-        "language": "javascript",
-        "framework": "nginx"
-      },
-      "attrs": {
-        "baseImage": "nginx:1.27-alpine",
-        "buildStages": 2,
-        "directory": "web",
-        "dockerfile": "Dockerfile",
-        "nameFrom": "directory",
-        "ports": [
-          80
-        ]
-      },
-      "sources": [
-        {
-          "extractor": "dockerfile",
-          "path": "web/Dockerfile",
-          "line": 1
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "service:dockerfile/python/worker",
-      "kind": "service",
-      "layer": "container",
-      "name": "worker",
-      "namespace": "python",
-      "tech": {
-        "language": "python"
-      },
-      "attrs": {
-        "baseImage": "python:3.12-slim",
-        "directory": "worker",
-        "dockerfile": "Dockerfile",
-        "nameFrom": "directory",
-        "ports": [
-          5678
-        ]
-      },
-      "sources": [
-        {
-          "extractor": "dockerfile",
-          "path": "worker/Dockerfile",
-          "line": 1
-        },
-        {
-          "extractor": "dockerfile",
-          "path": "worker/Dockerfile.debug",
-          "line": 2
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "service:manifest/go/api",
+      "id": "container:api",
       "kind": "service",
       "layer": "container",
       "name": "github.com/acme/orders-api",
-      "namespace": "go",
       "tech": {
         "language": "go"
       },
@@ -202,13 +44,199 @@
         }
       ],
       "confidence": 0.8
+    },
+    {
+      "id": "container:cache",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "cache",
+      "tech": {
+        "framework": "redis"
+      },
+      "attrs": {
+        "baseImage": "redis:7-alpine",
+        "directory": "cache",
+        "dockerfile": "Dockerfile",
+        "nameFrom": "directory",
+        "ports": [
+          6379
+        ]
+      },
+      "sources": [
+        {
+          "extractor": "dockerfile",
+          "path": "cache/Dockerfile",
+          "line": 1
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "container:orders-db",
+      "kind": "datastore",
+      "layer": "container",
+      "name": "orders-db",
+      "tech": {
+        "framework": "postgresql"
+      },
+      "attrs": {
+        "baseImage": "postgres:16-alpine",
+        "directory": "orders-db",
+        "dockerfile": "Dockerfile",
+        "nameFrom": "directory",
+        "ports": [
+          5432
+        ]
+      },
+      "sources": [
+        {
+          "extractor": "dockerfile",
+          "path": "orders-db/Dockerfile",
+          "line": 2
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "container:tools/migrator/docker",
+      "kind": "service",
+      "layer": "container",
+      "name": "migrator",
+      "tech": {
+        "language": "go"
+      },
+      "attrs": {
+        "baseImage": "golang:1.22-alpine",
+        "directory": "tools/migrator/docker",
+        "dockerfile": "Dockerfile",
+        "nameFrom": "directory"
+      },
+      "sources": [
+        {
+          "extractor": "dockerfile",
+          "path": "tools/migrator/docker/Dockerfile",
+          "line": 3
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "container:web",
+      "kind": "service",
+      "layer": "container",
+      "name": "web",
+      "tech": {
+        "language": "javascript",
+        "framework": "nginx"
+      },
+      "attrs": {
+        "baseImage": "nginx:1.27-alpine",
+        "buildStages": 2,
+        "directory": "web",
+        "dockerfile": "Dockerfile",
+        "nameFrom": "directory",
+        "ports": [
+          80
+        ]
+      },
+      "sources": [
+        {
+          "extractor": "dockerfile",
+          "path": "web/Dockerfile",
+          "line": 1
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "container:worker",
+      "kind": "service",
+      "layer": "container",
+      "name": "worker",
+      "tech": {
+        "language": "python"
+      },
+      "attrs": {
+        "baseImage": "python:3.12-slim",
+        "directory": "worker",
+        "dockerfile": "Dockerfile",
+        "nameFrom": "directory",
+        "ports": [
+          5678
+        ]
+      },
+      "sources": [
+        {
+          "extractor": "dockerfile",
+          "path": "worker/Dockerfile",
+          "line": 1
+        },
+        {
+          "extractor": "dockerfile",
+          "path": "worker/Dockerfile.debug",
+          "line": 2
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "context:stripe",
+      "kind": "external",
+      "layer": "context",
+      "name": "stripe",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "stripe"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "api/go.mod",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
     }
   ],
   "edges": [
     {
-      "id": "e:2ab4ff2fc814",
-      "from": "service:dockerfile/go/tools/migrator/docker",
-      "to": "datastore:dockerfile/container/orders-db",
+      "id": "e:f9b765d9ad74",
+      "from": "container:api",
+      "to": "container:orders-db",
+      "kind": "persists_to",
+      "protocol": "postgres",
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "extractor": "dockerfile",
+          "path": "api/Dockerfile",
+          "line": 12,
+          "rule": "dns_exact",
+          "detail": "ENV DATABASE_URL=postgres://orders-db:5432/orders (resolves to orders-db)"
+        }
+      ]
+    },
+    {
+      "id": "e:a363d48be1dc",
+      "from": "container:api",
+      "to": "context:stripe",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.4,
+      "evidence": [
+        {
+          "extractor": "manifest",
+          "path": "api/go.mod",
+          "line": 1,
+          "rule": "dependency_names_vendor",
+          "detail": "go.mod depends on \"github.com/stripe/stripe-go/v78\", which indicates stripe (resolves to stripe)"
+        }
+      ]
+    },
+    {
+      "id": "e:60be7a7865e0",
+      "from": "container:tools/migrator/docker",
+      "to": "container:orders-db",
       "kind": "persists_to",
       "protocol": "postgres",
       "confidence": 0.8,
@@ -223,9 +251,9 @@
       ]
     },
     {
-      "id": "e:2802a8d1c32e",
-      "from": "service:dockerfile/javascript/web",
-      "to": "service:manifest/go/api",
+      "id": "e:14a9d3b07c50",
+      "from": "container:web",
+      "to": "container:api",
       "kind": "calls",
       "protocol": "http",
       "confidence": 0.8,
@@ -240,9 +268,9 @@
       ]
     },
     {
-      "id": "e:b7e864241bd1",
-      "from": "service:dockerfile/python/worker",
-      "to": "datastore:dockerfile/container/cache",
+      "id": "e:9f297c4882da",
+      "from": "container:worker",
+      "to": "container:cache",
       "kind": "persists_to",
       "protocol": "redis",
       "confidence": 0.8,
@@ -260,40 +288,6 @@
           "line": 6,
           "rule": "dns_exact",
           "detail": "ENV REDIS_URL=redis://cache:6379/0 (resolves to cache)"
-        }
-      ]
-    },
-    {
-      "id": "e:40c67e763c90",
-      "from": "service:manifest/go/api",
-      "to": "datastore:dockerfile/container/orders-db",
-      "kind": "persists_to",
-      "protocol": "postgres",
-      "confidence": 0.8,
-      "evidence": [
-        {
-          "extractor": "dockerfile",
-          "path": "api/Dockerfile",
-          "line": 12,
-          "rule": "dns_exact",
-          "detail": "ENV DATABASE_URL=postgres://orders-db:5432/orders (resolves to orders-db)"
-        }
-      ]
-    },
-    {
-      "id": "e:12aff83ad66d",
-      "from": "service:manifest/go/api",
-      "to": "external:resolver/vendor/stripe",
-      "kind": "calls",
-      "protocol": "https",
-      "confidence": 0.4,
-      "evidence": [
-        {
-          "extractor": "manifest",
-          "path": "api/go.mod",
-          "line": 1,
-          "rule": "dependency_names_vendor",
-          "detail": "go.mod depends on \"github.com/stripe/stripe-go/v78\", which indicates stripe (resolves to stripe)"
         }
       ]
     }

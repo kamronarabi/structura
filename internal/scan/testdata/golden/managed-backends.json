@@ -1,161 +1,16 @@
 {
-  "schemaVersion": "0.3.0",
+  "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:8f9c2971683e8d77f9c58ba88ab1cd76518f4c9e9e58948c7c11719996e43427",
+  "contentHash": "sha256:5265226be2449aee7524206ac479d99a31fb46cc99683ae8eafd43906772e777",
   "root": {
     "name": "managed-backends"
   },
   "nodes": [
     {
-      "id": "external:resolver/net/kbqjfnwtsdplmvxr.supabase.co",
-      "kind": "external",
-      "layer": "context",
-      "name": "kbqjfnwtsdplmvxr.supabase.co",
-      "namespace": "net",
-      "attrs": {
-        "hostname": "kbqjfnwtsdplmvxr.supabase.co"
-      },
-      "sources": [
-        {
-          "extractor": "dotenv",
-          "path": ".env.production",
-          "line": 1
-        }
-      ],
-      "confidence": 0.8
-    },
-    {
-      "id": "external:resolver/vendor/anthropic",
-      "kind": "external",
-      "layer": "context",
-      "name": "anthropic",
-      "namespace": "vendor",
-      "attrs": {
-        "vendor": "anthropic"
-      },
-      "sources": [
-        {
-          "extractor": "manifest",
-          "path": "package.json",
-          "line": 1
-        }
-      ],
-      "confidence": 0.4
-    },
-    {
-      "id": "external:resolver/vendor/clerk",
-      "kind": "external",
-      "layer": "context",
-      "name": "clerk",
-      "namespace": "vendor",
-      "attrs": {
-        "vendor": "clerk"
-      },
-      "sources": [
-        {
-          "extractor": "manifest",
-          "path": "package.json",
-          "line": 1
-        }
-      ],
-      "confidence": 0.4
-    },
-    {
-      "id": "external:resolver/vendor/pinecone",
-      "kind": "external",
-      "layer": "context",
-      "name": "pinecone",
-      "namespace": "vendor",
-      "attrs": {
-        "vendor": "pinecone"
-      },
-      "sources": [
-        {
-          "extractor": "manifest",
-          "path": "package.json",
-          "line": 1
-        }
-      ],
-      "confidence": 0.4
-    },
-    {
-      "id": "external:resolver/vendor/posthog",
-      "kind": "external",
-      "layer": "context",
-      "name": "posthog",
-      "namespace": "vendor",
-      "attrs": {
-        "vendor": "posthog"
-      },
-      "sources": [
-        {
-          "extractor": "manifest",
-          "path": "package.json",
-          "line": 1
-        }
-      ],
-      "confidence": 0.4
-    },
-    {
-      "id": "external:resolver/vendor/resend",
-      "kind": "external",
-      "layer": "context",
-      "name": "resend",
-      "namespace": "vendor",
-      "attrs": {
-        "vendor": "resend"
-      },
-      "sources": [
-        {
-          "extractor": "manifest",
-          "path": "package.json",
-          "line": 1
-        }
-      ],
-      "confidence": 0.4
-    },
-    {
-      "id": "external:resolver/vendor/stripe",
-      "kind": "external",
-      "layer": "context",
-      "name": "stripe",
-      "namespace": "vendor",
-      "attrs": {
-        "vendor": "stripe"
-      },
-      "sources": [
-        {
-          "extractor": "manifest",
-          "path": "package.json",
-          "line": 1
-        }
-      ],
-      "confidence": 0.4
-    },
-    {
-      "id": "external:resolver/vendor/upstash",
-      "kind": "external",
-      "layer": "context",
-      "name": "upstash",
-      "namespace": "vendor",
-      "attrs": {
-        "vendor": "upstash"
-      },
-      "sources": [
-        {
-          "extractor": "manifest",
-          "path": "package.json",
-          "line": 1
-        }
-      ],
-      "confidence": 0.4
-    },
-    {
-      "id": "service:manifest/typescript/root",
+      "id": "container:root",
       "kind": "service",
       "layer": "container",
       "name": "storefront",
-      "namespace": "typescript",
       "tech": {
         "language": "typescript",
         "framework": "nextjs"
@@ -184,13 +39,191 @@
         }
       ],
       "confidence": 0.8
+    },
+    {
+      "id": "context:anthropic",
+      "kind": "external",
+      "layer": "context",
+      "name": "anthropic",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "anthropic"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "context:clerk",
+      "kind": "external",
+      "layer": "context",
+      "name": "clerk",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "clerk"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "context:kbqjfnwtsdplmvxr.supabase.co",
+      "kind": "external",
+      "layer": "context",
+      "name": "kbqjfnwtsdplmvxr.supabase.co",
+      "namespace": "net",
+      "attrs": {
+        "hostname": "kbqjfnwtsdplmvxr.supabase.co"
+      },
+      "sources": [
+        {
+          "extractor": "dotenv",
+          "path": ".env.production",
+          "line": 1
+        }
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "context:pinecone",
+      "kind": "external",
+      "layer": "context",
+      "name": "pinecone",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "pinecone"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "context:posthog",
+      "kind": "external",
+      "layer": "context",
+      "name": "posthog",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "posthog"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "context:resend",
+      "kind": "external",
+      "layer": "context",
+      "name": "resend",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "resend"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "context:stripe",
+      "kind": "external",
+      "layer": "context",
+      "name": "stripe",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "stripe"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
+    },
+    {
+      "id": "context:upstash",
+      "kind": "external",
+      "layer": "context",
+      "name": "upstash",
+      "namespace": "vendor",
+      "attrs": {
+        "vendor": "upstash"
+      },
+      "sources": [
+        {
+          "extractor": "manifest",
+          "path": "package.json",
+          "line": 1
+        }
+      ],
+      "confidence": 0.4
     }
   ],
   "edges": [
     {
-      "id": "e:5bd31214ae74",
-      "from": "service:manifest/typescript/root",
-      "to": "external:resolver/net/kbqjfnwtsdplmvxr.supabase.co",
+      "id": "e:bb13c611d886",
+      "from": "container:root",
+      "to": "context:anthropic",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.4,
+      "evidence": [
+        {
+          "extractor": "manifest",
+          "path": "package.json",
+          "line": 1,
+          "rule": "dependency_names_vendor",
+          "detail": "package.json depends on \"@anthropic-ai/sdk\", which indicates anthropic (resolves to anthropic)"
+        }
+      ]
+    },
+    {
+      "id": "e:84a4b5976253",
+      "from": "container:root",
+      "to": "context:clerk",
+      "kind": "calls",
+      "protocol": "https",
+      "confidence": 0.4,
+      "evidence": [
+        {
+          "extractor": "manifest",
+          "path": "package.json",
+          "line": 1,
+          "rule": "dependency_names_vendor",
+          "detail": "package.json depends on \"@clerk/nextjs\", which indicates clerk (resolves to clerk)"
+        }
+      ]
+    },
+    {
+      "id": "e:4bc87e06583a",
+      "from": "container:root",
+      "to": "context:kbqjfnwtsdplmvxr.supabase.co",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.8,
@@ -212,43 +245,9 @@
       ]
     },
     {
-      "id": "e:444d0e96b965",
-      "from": "service:manifest/typescript/root",
-      "to": "external:resolver/vendor/anthropic",
-      "kind": "calls",
-      "protocol": "https",
-      "confidence": 0.4,
-      "evidence": [
-        {
-          "extractor": "manifest",
-          "path": "package.json",
-          "line": 1,
-          "rule": "dependency_names_vendor",
-          "detail": "package.json depends on \"@anthropic-ai/sdk\", which indicates anthropic (resolves to anthropic)"
-        }
-      ]
-    },
-    {
-      "id": "e:2f4a87b8f4be",
-      "from": "service:manifest/typescript/root",
-      "to": "external:resolver/vendor/clerk",
-      "kind": "calls",
-      "protocol": "https",
-      "confidence": 0.4,
-      "evidence": [
-        {
-          "extractor": "manifest",
-          "path": "package.json",
-          "line": 1,
-          "rule": "dependency_names_vendor",
-          "detail": "package.json depends on \"@clerk/nextjs\", which indicates clerk (resolves to clerk)"
-        }
-      ]
-    },
-    {
-      "id": "e:96e38f7eaf3e",
-      "from": "service:manifest/typescript/root",
-      "to": "external:resolver/vendor/pinecone",
+      "id": "e:16d3d217a2b5",
+      "from": "container:root",
+      "to": "context:pinecone",
       "kind": "persists_to",
       "protocol": "https",
       "confidence": 0.4,
@@ -263,9 +262,9 @@
       ]
     },
     {
-      "id": "e:82236b40738d",
-      "from": "service:manifest/typescript/root",
-      "to": "external:resolver/vendor/posthog",
+      "id": "e:85071eebbbf8",
+      "from": "container:root",
+      "to": "context:posthog",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.4,
@@ -280,9 +279,9 @@
       ]
     },
     {
-      "id": "e:f5ed318efa77",
-      "from": "service:manifest/typescript/root",
-      "to": "external:resolver/vendor/resend",
+      "id": "e:cc05a8222387",
+      "from": "container:root",
+      "to": "context:resend",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.4,
@@ -297,9 +296,9 @@
       ]
     },
     {
-      "id": "e:75d7f2986ccf",
-      "from": "service:manifest/typescript/root",
-      "to": "external:resolver/vendor/stripe",
+      "id": "e:5d0d13625edb",
+      "from": "container:root",
+      "to": "context:stripe",
       "kind": "calls",
       "protocol": "https",
       "confidence": 0.4,
@@ -314,9 +313,9 @@
       ]
     },
     {
-      "id": "e:61eb83e8588f",
-      "from": "service:manifest/typescript/root",
-      "to": "external:resolver/vendor/upstash",
+      "id": "e:0efb19e7a3ca",
+      "from": "container:root",
+      "to": "context:upstash",
       "kind": "persists_to",
       "protocol": "https",
       "confidence": 0.4,

@@ -11,11 +11,11 @@ import (
 // builder assembles resolver input readably.
 type builder struct{ in resolve.Input }
 
-func (b *builder) node(kind schema.NodeKind, source, namespace, name string, attrs schema.Attrs) string {
-	id := schema.NewNodeID(kind, source, namespace, name)
+func (b *builder) node(kind schema.NodeKind, scope, name string, attrs schema.Attrs) string {
+	id := schema.NewNodeID(kind, scope, name)
 	b.in.Nodes = append(b.in.Nodes, schema.Node{
-		ID: id, Kind: kind, Layer: schema.LayerContainer,
-		Name: name, Namespace: namespace, Attrs: attrs, Confidence: 1,
+		ID: id, Kind: kind, Layer: schema.LayerOf(kind),
+		Name: name, Namespace: scope, Attrs: attrs, Confidence: 1,
 	})
 	return id
 }
@@ -99,10 +99,10 @@ func (r result) node(t *testing.T, name string) schema.Node {
 
 func TestServiceSelectorConnectsReferencesToWorkloads(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "k8s", "prod", "api", schema.Attrs{
+	api := b.node(schema.KindService, "prod", "api", schema.Attrs{
 		"labels": map[string]string{"app": "api"},
 	})
-	web := b.node(schema.KindService, "k8s", "prod", "web", nil)
+	web := b.node(schema.KindService, "prod", "web", nil)
 
 	// The Service is not a node; it contributes the name "api" routes by.
 	b.alias(resolve.Alias{
@@ -132,7 +132,7 @@ func TestServiceSelectorConnectsReferencesToWorkloads(t *testing.T) {
 
 func TestUnmatchedSelectorIsReported(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindService, "k8s", "prod", "api", schema.Attrs{
+	b.node(schema.KindService, "prod", "api", schema.Attrs{
 		"labels": map[string]string{"app": "something-else"},
 	})
 	b.alias(resolve.Alias{
@@ -151,7 +151,7 @@ func TestUnmatchedSelectorIsReported(t *testing.T) {
 func TestServiceSelectingManyWorkloadsIsReported(t *testing.T) {
 	b := &builder{}
 	for _, name := range []string{"api-blue", "api-green"} {
-		b.node(schema.KindService, "k8s", "prod", name, schema.Attrs{
+		b.node(schema.KindService, "prod", name, schema.Attrs{
 			"labels": map[string]string{"app": "api"},
 		})
 	}
@@ -171,11 +171,11 @@ func TestServiceSelectingManyWorkloadsIsReported(t *testing.T) {
 func TestAmbiguousReferenceIsRefusedNotGuessed(t *testing.T) {
 	b := &builder{}
 	for _, env := range []string{"dev", "staging", "prod"} {
-		b.node(schema.KindDatastore, "k8s", env, "db", nil)
+		b.node(schema.KindDatastore, env, "db", nil)
 	}
 	// The referring node is in no environment, so namespace scoping cannot
 	// break the tie.
-	api := b.node(schema.KindService, "k8s", "default", "api", nil)
+	api := b.node(schema.KindService, "default", "api", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintConnString, Raw: "postgres://db:5432/app",
 		Tokens: []string{"db"}, Port: 5432, SuggestedEdge: schema.EdgePersistsTo,
@@ -205,9 +205,9 @@ func TestAmbiguousReferenceIsRefusedNotGuessed(t *testing.T) {
 func TestNamespaceScopingBreaksTies(t *testing.T) {
 	b := &builder{}
 	for _, env := range []string{"dev", "prod"} {
-		b.node(schema.KindDatastore, "k8s", env, "db", nil)
+		b.node(schema.KindDatastore, env, "db", nil)
 	}
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintConnString, Raw: "postgres://db:5432/app",
 		Tokens: []string{"db"}, SuggestedEdge: schema.EdgePersistsTo,
@@ -215,7 +215,7 @@ func TestNamespaceScopingBreaksTies(t *testing.T) {
 
 	r := b.run()
 	e := r.edge(t, "api", "db")
-	if !strings.Contains(e.To, "/prod/") {
+	if !strings.Contains(e.To, "@prod/") {
 		t.Errorf("edge points at %q, want the database in the referrer's own namespace", e.To)
 	}
 	if r.hasDiag("ambiguous_reference") {
@@ -225,9 +225,9 @@ func TestNamespaceScopingBreaksTies(t *testing.T) {
 
 func TestPortNarrowsButNeverDecidesAlone(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindDatastore, "k8s", "prod", "store", schema.Attrs{"ports": []int{5432}})
-	b.node(schema.KindDatastore, "k8s", "prod", "cache", schema.Attrs{"ports": []int{6379}})
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	b.node(schema.KindDatastore, "prod", "store", schema.Attrs{"ports": []int{5432}})
+	b.node(schema.KindDatastore, "prod", "cache", schema.Attrs{"ports": []int{6379}})
+	api := b.node(schema.KindService, "prod", "api", nil)
 
 	// A port alone is not a name: half the services in a repository listen
 	// on the same handful of ports.
@@ -244,7 +244,7 @@ func TestPortNarrowsButNeverDecidesAlone(t *testing.T) {
 
 func TestExternalHostsBecomeNodes(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintEnvURL, Raw: "https://api.stripe.com",
 		Tokens: []string{"api.stripe.com"}, Port: 443, Protocol: "https",
@@ -270,7 +270,7 @@ func TestExternalHostsBecomeNodes(t *testing.T) {
 // node for it would put a fictional third party on the diagram.
 func TestUnmatchedBareNamesDoNotBecomeExternalNodes(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintEnvHost, Raw: "search-service",
 		Tokens: []string{"search-service"}, SuggestedEdge: schema.EdgeCalls,
@@ -289,7 +289,7 @@ func TestUnmatchedBareNamesDoNotBecomeExternalNodes(t *testing.T) {
 
 func TestClusterInternalSuffixesAreNotExternal(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
 	for _, host := range []string{"warehouse.legacy.internal", "db.cluster.local", "thing.svc"} {
 		b.hint(resolve.Hint{
 			FromNode: api, Kind: resolve.HintEnvHost, Raw: host,
@@ -309,18 +309,18 @@ func TestClusterInternalSuffixesAreNotExternal(t *testing.T) {
 // deployment.
 func TestCodebaseMergesIntoTheContainerThatRunsIt(t *testing.T) {
 	b := &builder{}
-	deployment := b.node(schema.KindService, "compose", "shop", "gateway", schema.Attrs{
+	deployment := b.node(schema.KindService, "shop", "gateway", schema.Attrs{
 		"buildContext": "services/gateway",
 	})
 	b.in.Nodes[len(b.in.Nodes)-1].Tech = &schema.Tech{Runtime: "container"}
 
-	code := b.node(schema.KindService, "manifest", "go", "services/gateway", schema.Attrs{
+	code := b.node(schema.KindService, "", "services/gateway", schema.Attrs{
 		"directory": "services/gateway",
 		"module":    "github.com/acme/gateway",
 	})
 	b.in.Nodes[len(b.in.Nodes)-1].Tech = &schema.Tech{Language: "go", Framework: "gin"}
 
-	db := b.node(schema.KindDatastore, "compose", "shop", "db", nil)
+	db := b.node(schema.KindDatastore, "shop", "db", nil)
 	b.hint(resolve.Hint{
 		FromNode: deployment, Kind: resolve.HintConnString, Raw: "postgres://db:5432/app",
 		Tokens: []string{"db"}, SuggestedEdge: schema.EdgePersistsTo,
@@ -352,8 +352,8 @@ func TestCodebaseMergesIntoTheContainerThatRunsIt(t *testing.T) {
 // file knows about the other.
 func TestConfigMapIndirection(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
-	b.node(schema.KindService, "k8s", "prod", "search", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
+	b.node(schema.KindService, "prod", "search", nil)
 
 	const ref = "configmap:prod/endpoints"
 	b.hint(resolve.Hint{
@@ -393,9 +393,9 @@ func TestConfigMapPseudoNodesNeverReachTheGraph(t *testing.T) {
 // finding.
 func TestLibraryHintsCorroborateButNeverEstablish(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
 	b.in.Nodes[len(b.in.Nodes)-1].Tech = &schema.Tech{Language: "go"}
-	b.node(schema.KindDatastore, "k8s", "prod", "db", schema.Attrs{"image": "postgres:16"})
+	b.node(schema.KindDatastore, "prod", "db", schema.Attrs{"image": "postgres:16"})
 	b.in.Nodes[len(b.in.Nodes)-1].Tech = &schema.Tech{Framework: "postgres"}
 
 	b.hint(resolve.Hint{
@@ -416,8 +416,8 @@ func TestLibraryHintsCorroborateButNeverEstablish(t *testing.T) {
 
 func TestLibraryHintAddsEvidenceToAnExistingEdge(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
-	db := b.node(schema.KindDatastore, "k8s", "prod", "db", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
+	db := b.node(schema.KindDatastore, "prod", "db", nil)
 	b.in.Nodes[len(b.in.Nodes)-1].Tech = &schema.Tech{Framework: "postgres"}
 
 	b.hint(resolve.Hint{
@@ -440,8 +440,8 @@ func TestLibraryHintAddsEvidenceToAnExistingEdge(t *testing.T) {
 // forces a reader to work out that they are the same arrow.
 func TestGenericDependencyCollapsesIntoTheSpecificOne(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "compose", "shop", "api", nil)
-	db := b.node(schema.KindDatastore, "compose", "shop", "db", nil)
+	api := b.node(schema.KindService, "shop", "api", nil)
+	db := b.node(schema.KindDatastore, "shop", "db", nil)
 
 	b.in.Edges = append(b.in.Edges, schema.Edge{
 		From: api, To: db, Kind: schema.EdgeDependsOn, Confidence: schema.ConfDeclared,
@@ -473,7 +473,7 @@ func TestGenericDependencyCollapsesIntoTheSpecificOne(t *testing.T) {
 
 func TestSelfReferencesAreNotEdges(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintEnvHost, Raw: "api",
 		Tokens: []string{"api"}, SuggestedEdge: schema.EdgeCalls,
@@ -486,8 +486,8 @@ func TestSelfReferencesAreNotEdges(t *testing.T) {
 
 func TestNormalizedNamesMatchAtLowerConfidence(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindService, "k8s", "prod", "user-service", nil)
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	b.node(schema.KindService, "prod", "user-service", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintEnvHost, Raw: "user_service",
 		Tokens: []string{"user_service"}, SuggestedEdge: schema.EdgeCalls,
@@ -505,9 +505,9 @@ func TestNormalizedNamesMatchAtLowerConfidence(t *testing.T) {
 func TestResolutionIsOrderIndependent(t *testing.T) {
 	build := func() *builder {
 		b := &builder{}
-		api := b.node(schema.KindService, "k8s", "prod", "api", nil)
-		b.node(schema.KindDatastore, "k8s", "prod", "db", nil)
-		b.node(schema.KindQueue, "k8s", "prod", "queue", nil)
+		api := b.node(schema.KindService, "prod", "api", nil)
+		b.node(schema.KindDatastore, "prod", "db", nil)
+		b.node(schema.KindQueue, "prod", "queue", nil)
 		for _, token := range []string{"db", "queue"} {
 			b.hint(resolve.Hint{
 				FromNode: api, Kind: resolve.HintConnString, Raw: token,
@@ -533,8 +533,8 @@ func TestResolutionIsOrderIndependent(t *testing.T) {
 
 func TestEveryEdgeCarriesEvidence(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
-	b.node(schema.KindDatastore, "k8s", "prod", "db", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
+	b.node(schema.KindDatastore, "prod", "db", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintConnString, Raw: "postgres://db:5432/app",
 		Tokens: []string{"db"}, SuggestedEdge: schema.EdgePersistsTo,
@@ -561,8 +561,8 @@ func TestEveryEdgeCarriesEvidence(t *testing.T) {
 // the local one. One candidate is not the same as the right candidate.
 func TestReferenceResolvesInsideItsOwnScopeFirst(t *testing.T) {
 	b := &builder{}
-	local := b.node(schema.KindDatastore, "compose", "shop", "orders-db", nil)
-	foreign := b.node(schema.KindDatastore, "k8s", "prod", "orders-db", nil)
+	local := b.node(schema.KindDatastore, "shop", "orders-db", nil)
+	foreign := b.node(schema.KindDatastore, "prod", "orders-db", nil)
 	// A Service in the foreign namespace contributes DNS names, which is
 	// what makes dns_exact -- the strongest rule -- reach across.
 	b.alias(resolve.Alias{
@@ -570,7 +570,7 @@ func TestReferenceResolvesInsideItsOwnScopeFirst(t *testing.T) {
 		DNS: []string{"orders-db", "orders-db.prod", "orders-db.prod.svc.cluster.local"},
 	})
 	_ = foreign
-	checkout := b.node(schema.KindService, "compose", "shop", "checkout", nil)
+	checkout := b.node(schema.KindService, "shop", "checkout", nil)
 	b.hint(resolve.Hint{
 		FromNode: checkout, Kind: resolve.HintConnString,
 		Raw:    "postgres://checkout@orders-db:5432/orders",
@@ -595,8 +595,8 @@ func TestReferenceResolvesInsideItsOwnScopeFirst(t *testing.T) {
 // dependency, when one was found and rejected.
 func TestOutOfScopeReferenceIsRefusedAndReported(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindQueue, "compose", "shop", "broker", nil)
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	b.node(schema.KindQueue, "shop", "broker", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintConnString, Raw: "amqp://broker:5672",
 		Tokens: []string{"broker"}, Port: 5672, SuggestedEdge: schema.EdgePublishesTo,
@@ -618,7 +618,7 @@ func TestOutOfScopeReferenceIsRefusedAndReported(t *testing.T) {
 // remove exactly the dependencies a reader most wants to see.
 func TestExternalsAreReachableFromAnyNamespace(t *testing.T) {
 	b := &builder{}
-	api := b.node(schema.KindService, "k8s", "prod", "api", nil)
+	api := b.node(schema.KindService, "prod", "api", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintEnvURL, Raw: "https://api.stripe.com",
 		Tokens: []string{"api.stripe.com"}, SuggestedEdge: schema.EdgeCalls,
@@ -639,8 +639,8 @@ func TestExternalsAreReachableFromAnyNamespace(t *testing.T) {
 // nothing and reads as a finding.
 func TestBoundariesAreNeverResolutionTargets(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindBoundary, "helm", "podinfo", "podinfo", nil)
-	svc := b.node(schema.KindService, "helm", "podinfo", "podinfo-svc", nil)
+	b.node(schema.KindBoundary, "podinfo", "podinfo", nil)
+	svc := b.node(schema.KindService, "podinfo", "podinfo-svc", nil)
 	b.hint(resolve.Hint{
 		FromNode: svc, Kind: resolve.HintEnvHost, Raw: "podinfo",
 		Tokens: []string{"podinfo"}, SuggestedEdge: schema.EdgeCalls,
@@ -663,10 +663,10 @@ func TestBoundariesAreNeverResolutionTargets(t *testing.T) {
 // a diagram that is not a missing detail, it is the same box twice.
 func TestDeploymentJoinsItsCodeWithoutABuildContext(t *testing.T) {
 	b := &builder{}
-	code := b.node(schema.KindService, "manifest", "go", "checkoutservice",
+	code := b.node(schema.KindService, "", "checkoutservice",
 		schema.Attrs{"directory": "src/checkoutservice", "module": "acme/checkoutservice"})
 	b.in.Nodes[len(b.in.Nodes)-1].Tech = &schema.Tech{Language: "go"}
-	deployment := b.node(schema.KindService, "k8s", "default", "checkoutservice",
+	deployment := b.node(schema.KindService, "default", "checkoutservice",
 		schema.Attrs{"image": "checkoutservice:1.0"})
 
 	r := b.run()
@@ -704,10 +704,10 @@ func TestDeploymentJoinsItsCodeWithoutABuildContext(t *testing.T) {
 // drawing two.
 func TestNameCollisionAcrossProjectsIsNotAJoin(t *testing.T) {
 	b := &builder{}
-	code := b.node(schema.KindService, "manifest", "javascript", "web",
+	code := b.node(schema.KindService, "", "web",
 		schema.Attrs{"directory": "nginx-nodejs-redis/web"})
 	for _, project := range []string{"angular", "django", "nginx-flask-mongo"} {
-		b.node(schema.KindService, "compose", project, "web",
+		b.node(schema.KindService, project, "web",
 			schema.Attrs{"image": "web:latest"})
 	}
 
@@ -730,9 +730,9 @@ func TestNameCollisionAcrossProjectsIsNotAJoin(t *testing.T) {
 // TestBuildContextJoinStillWins keeps the stronger signal authoritative.
 func TestBuildContextJoinStillWins(t *testing.T) {
 	b := &builder{}
-	code := b.node(schema.KindService, "manifest", "go", "checkout",
+	code := b.node(schema.KindService, "", "checkout",
 		schema.Attrs{"directory": "services/checkout"})
-	b.node(schema.KindService, "compose", "shop", "checkout",
+	b.node(schema.KindService, "shop", "checkout",
 		schema.Attrs{"buildContext": "services/checkout", "image": "shop-checkout"})
 
 	r := b.run()
@@ -759,8 +759,8 @@ func TestADisambiguatedMatchScoresBelowAnUnambiguousOne(t *testing.T) {
 	// One component answers to the name, so nothing has to be decided.
 	unambiguous := func() float64 {
 		b := &builder{}
-		b.node(schema.KindDatastore, "compose", "shop", "cache", nil)
-		api := b.node(schema.KindService, "compose", "shop", "api", nil)
+		b.node(schema.KindDatastore, "shop", "cache", nil)
+		api := b.node(schema.KindService, "shop", "api", nil)
 		b.hint(resolve.Hint{
 			FromNode: api, Kind: resolve.HintConnString,
 			Raw:    "redis://cache:6379/0",
@@ -773,21 +773,19 @@ func TestADisambiguatedMatchScoresBelowAnUnambiguousOne(t *testing.T) {
 		return r.Edges[0].Confidence
 	}()
 
-	// Two components answer to it, in the same project and namespace, so the
-	// locality gate cannot separate them. What decides is the kind the
+	// Two components answer to it and the referrer is in neither's scope, so
+	// the locality gate cannot separate them. What decides is the kind the
 	// reference implies: a redis:// URL means the datastore. Correct, and a
 	// decision nonetheless.
 	//
-	// The two come from different formats, which is the shape this ambiguity
-	// really has: one Compose project cannot hold two services called cache,
-	// and two files of one format that do are folded before matching runs. A
-	// Compose file and a cluster manifest both declaring "cache" are not
-	// folded, because whether two formats describe one component or two is a
-	// question neither file answers.
+	// The two are in different scopes, which is the shape this ambiguity has
+	// now: one scope cannot hold two components of one name, because that is
+	// one identifier. Two scopes reusing a name is the common case -- a dev
+	// and a prod overlay, a chart beside a cluster.
 	b := &builder{}
-	store := b.node(schema.KindDatastore, "compose", "shop", "cache", nil)
-	b.node(schema.KindService, "k8s", "shop", "cache", nil)
-	api := b.node(schema.KindService, "compose", "shop", "api", nil)
+	store := b.node(schema.KindDatastore, "staging", "cache", nil)
+	b.node(schema.KindService, "prod", "cache", nil)
+	api := b.node(schema.KindService, "", "api", nil)
 	b.hint(resolve.Hint{
 		FromNode: api, Kind: resolve.HintConnString,
 		Raw:    "redis://cache:6379/0",

@@ -23,11 +23,11 @@ func trees(s project.Suspect) string { return strings.Join(s.Trees, " + ") }
 // members from both.
 func TestTwoStacksSharingOnlyANamespaceAreReported(t *testing.T) {
 	nodes := []schema.Node{
-		node("boundary:k8s/prod/prod", schema.KindBoundary, "prod",
+		node("context:@prod/prod", schema.KindBoundary, "prod",
 			"samples/shop/deploy/api.yaml", "samples/admin/deploy/api.yaml"),
-		node("service:k8s/prod/checkout", schema.KindService, "checkout", "samples/shop/deploy/api.yaml"),
-		node("datastore:k8s/prod/orders-db", schema.KindDatastore, "orders-db", "samples/shop/deploy/api.yaml"),
-		node("service:k8s/prod/reports", schema.KindService, "reports", "samples/admin/deploy/api.yaml"),
+		node("container:@prod/checkout", schema.KindService, "checkout", "samples/shop/deploy/api.yaml"),
+		node("container:@prod/orders-db", schema.KindDatastore, "orders-db", "samples/shop/deploy/api.yaml"),
+		node("container:@prod/reports", schema.KindService, "reports", "samples/admin/deploy/api.yaml"),
 	}
 
 	got := project.Suspects(nodes, project.Discover(nil))
@@ -46,9 +46,9 @@ func TestTwoStacksSharingOnlyANamespaceAreReported(t *testing.T) {
 // directories. That is the layout the graph is built for.
 func TestDivergenceAtTheRepositoryRootIsNotSuspicious(t *testing.T) {
 	nodes := []schema.Node{
-		node("boundary:k8s/prod/prod", schema.KindBoundary, "prod",
+		node("context:@prod/prod", schema.KindBoundary, "prod",
 			"base/api.yaml", "overlays/prod/api.yaml"),
-		node("service:k8s/prod/api", schema.KindService, "api",
+		node("container:@prod/api", schema.KindService, "api",
 			"base/api.yaml", "overlays/prod/api.yaml"),
 	}
 
@@ -62,9 +62,9 @@ func TestDivergenceAtTheRepositoryRootIsNotSuspicious(t *testing.T) {
 // to count even though that component is one of the ones that collided.
 func TestOverlaysSharingARealComponentAreNotSuspicious(t *testing.T) {
 	nodes := []schema.Node{
-		node("boundary:k8s/prod/prod", schema.KindBoundary, "prod",
+		node("context:@prod/prod", schema.KindBoundary, "prod",
 			"apps/shop/base/api.yaml", "apps/shop/overlays/prod/api.yaml"),
-		node("service:k8s/prod/api", schema.KindService, "api",
+		node("container:@prod/api", schema.KindService, "api",
 			"apps/shop/base/api.yaml", "apps/shop/overlays/prod/api.yaml"),
 	}
 
@@ -76,12 +76,12 @@ func TestOverlaysSharingARealComponentAreNotSuspicious(t *testing.T) {
 // Two projects both calling Stripe have said nothing about being one project.
 func TestASharedExternalIsNotEvidenceOfOneProject(t *testing.T) {
 	nodes := []schema.Node{
-		node("boundary:k8s/prod/prod", schema.KindBoundary, "prod",
+		node("context:@prod/prod", schema.KindBoundary, "prod",
 			"samples/a/deploy/app.yaml", "samples/b/deploy/app.yaml"),
-		node("external:resolver/net/api.stripe.com", schema.KindExternal, "api.stripe.com",
+		node("context:api.stripe.com", schema.KindExternal, "api.stripe.com",
 			"samples/a/deploy/app.yaml", "samples/b/deploy/app.yaml"),
-		node("service:k8s/prod/one", schema.KindService, "one", "samples/a/deploy/app.yaml"),
-		node("service:k8s/prod/two", schema.KindService, "two", "samples/b/deploy/app.yaml"),
+		node("container:@prod/one", schema.KindService, "one", "samples/a/deploy/app.yaml"),
+		node("container:@prod/two", schema.KindService, "two", "samples/b/deploy/app.yaml"),
 	}
 
 	if got := project.Suspects(nodes, project.Discover(nil)); len(got) != 1 {
@@ -92,7 +92,7 @@ func TestASharedExternalIsNotEvidenceOfOneProject(t *testing.T) {
 // Once the answer is written down, the question is not asked again.
 func TestDeclaredProjectsAreNotReported(t *testing.T) {
 	nodes := []schema.Node{
-		node("boundary:k8s/prod/prod", schema.KindBoundary, "prod",
+		node("context:@prod/prod", schema.KindBoundary, "prod",
 			"samples/shop/deploy/api.yaml", "samples/admin/deploy/api.yaml"),
 	}
 
@@ -106,9 +106,9 @@ func TestDeclaredProjectsAreNotReported(t *testing.T) {
 // a collision at all.
 func TestSingleDeclarationIsNotSuspicious(t *testing.T) {
 	nodes := []schema.Node{
-		node("boundary:k8s/prod/prod", schema.KindBoundary, "prod",
+		node("context:@prod/prod", schema.KindBoundary, "prod",
 			"samples/shop/deploy/a.yaml", "samples/shop/deploy/b.yaml"),
-		node("service:k8s/prod/api", schema.KindService, "api", "samples/shop/deploy/a.yaml"),
+		node("container:@prod/api", schema.KindService, "api", "samples/shop/deploy/a.yaml"),
 	}
 
 	if got := project.Suspects(nodes, project.Discover(nil)); len(got) != 0 {
@@ -118,8 +118,8 @@ func TestSingleDeclarationIsNotSuspicious(t *testing.T) {
 
 func TestNoSourcesIsNotSuspicious(t *testing.T) {
 	nodes := []schema.Node{
-		node("service:k8s/prod/api", schema.KindService, "api"),
-		node("service:k8s/prod/web", schema.KindService, "web"),
+		node("container:@prod/api", schema.KindService, "api"),
+		node("container:@prod/web", schema.KindService, "web"),
 	}
 	if got := project.Suspects(nodes, project.Discover(nil)); len(got) != 0 {
 		t.Errorf("suspects = %+v, want none", got)
@@ -129,12 +129,12 @@ func TestNoSourcesIsNotSuspicious(t *testing.T) {
 // Several collisions between one pair of trees are one question, not several.
 func TestCollisionsBetweenOnePairAreGroupedTogether(t *testing.T) {
 	nodes := []schema.Node{
-		node("boundary:k8s/prod/prod", schema.KindBoundary, "prod",
+		node("context:@prod/prod", schema.KindBoundary, "prod",
 			"samples/a/deploy/x.yaml", "samples/b/deploy/x.yaml"),
-		node("boundary:k8s/staging/staging", schema.KindBoundary, "staging",
+		node("context:@staging/staging", schema.KindBoundary, "staging",
 			"samples/a/deploy/y.yaml", "samples/b/deploy/y.yaml"),
-		node("service:k8s/prod/one", schema.KindService, "one", "samples/a/deploy/x.yaml"),
-		node("service:k8s/prod/two", schema.KindService, "two", "samples/b/deploy/x.yaml"),
+		node("container:@prod/one", schema.KindService, "one", "samples/a/deploy/x.yaml"),
+		node("container:@prod/two", schema.KindService, "two", "samples/b/deploy/x.yaml"),
 	}
 
 	got := project.Suspects(nodes, project.Discover(nil))
@@ -149,11 +149,11 @@ func TestCollisionsBetweenOnePairAreGroupedTogether(t *testing.T) {
 // Two scans of one tree must agree, so the report cannot depend on map order.
 func TestSuspectsAreDeterministic(t *testing.T) {
 	nodes := []schema.Node{
-		node("boundary:k8s/prod/prod", schema.KindBoundary, "prod",
+		node("context:@prod/prod", schema.KindBoundary, "prod",
 			"samples/c/x.yaml", "samples/a/x.yaml", "samples/b/x.yaml"),
-		node("service:k8s/prod/one", schema.KindService, "one", "samples/a/x.yaml"),
-		node("service:k8s/prod/two", schema.KindService, "two", "samples/b/x.yaml"),
-		node("service:k8s/prod/three", schema.KindService, "three", "samples/c/x.yaml"),
+		node("container:@prod/one", schema.KindService, "one", "samples/a/x.yaml"),
+		node("container:@prod/two", schema.KindService, "two", "samples/b/x.yaml"),
+		node("container:@prod/three", schema.KindService, "three", "samples/c/x.yaml"),
 	}
 
 	var first string

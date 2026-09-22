@@ -10,7 +10,7 @@ import (
 // project-tree check reads. The plain helper leaves Sources empty, and a node
 // with no recorded source is deliberately exempt.
 func (b *builder) nodeAt(kind schema.NodeKind, source, namespace, name, declaredAt string, attrs schema.Attrs) string {
-	id := b.node(kind, source, namespace, name, attrs)
+	id := b.node(kind, namespace, name, attrs)
 	last := &b.in.Nodes[len(b.in.Nodes)-1]
 	last.Sources = []schema.Source{{Extractor: source, Path: declaredAt, Line: 1}}
 	return id
@@ -155,7 +155,7 @@ func TestJoinAllowedWhenTheDeploymentHasNoRecordedSource(t *testing.T) {
 	b := &builder{}
 	code := b.nodeAt(schema.KindService, "manifest", "go", "api",
 		"src/api/go.mod", schema.Attrs{"directory": "src/api"})
-	b.node(schema.KindService, "k8s", "prod", "api", schema.Attrs{"image": "api:1.0"})
+	b.node(schema.KindService, "prod", "api", schema.Attrs{"image": "api:1.0"})
 
 	r := b.run()
 	if r.survives(code) {

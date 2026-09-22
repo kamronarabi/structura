@@ -9,7 +9,7 @@ import (
 // codebase adds a component that a file in some directory describes. derived
 // marks a name the file did not declare, the way a Dockerfile's does. The
 // namespace is the language, which is what both extractors put there.
-func (b *builder) codebase(source, namespace, name, dir string, derived bool, attrs schema.Attrs) string {
+func (b *builder) codebase(scope, name, dir string, derived bool, attrs schema.Attrs) string {
 	if attrs == nil {
 		attrs = schema.Attrs{}
 	}
@@ -17,10 +17,10 @@ func (b *builder) codebase(source, namespace, name, dir string, derived bool, at
 	if derived {
 		attrs["nameFrom"] = "directory"
 	}
-	id := b.node(schema.KindService, source, namespace, name, attrs)
+	id := b.node(schema.KindService, scope, name, attrs)
 	n := &b.in.Nodes[len(b.in.Nodes)-1]
-	n.Tech = &schema.Tech{Language: namespace}
-	n.Sources = []schema.Source{{Extractor: source, Path: dir + "/" + source, Line: 1}}
+	n.Tech = &schema.Tech{Language: "go"}
+	n.Sources = []schema.Source{{Extractor: "test", Path: dir + "/manifest", Line: 1}}
 	return id
 }
 
@@ -37,8 +37,8 @@ func (r result) hasNode(name string) bool {
 // built from it, which is one component.
 func TestManifestAndDockerfileInOneDirectoryAreOneComponent(t *testing.T) {
 	b := &builder{}
-	b.codebase("manifest", "go", "acme/checkout", "services/checkout", false, nil)
-	b.codebase("dockerfile", "go", "checkout", "services/checkout", true,
+	b.codebase("", "acme/checkout", "services/checkout", false, nil)
+	b.codebase("", "checkout", "services/checkout", true,
 		schema.Attrs{"baseImage": "golang:1.22", "ports": []int{8080}})
 
 	r := b.run()
@@ -72,9 +72,9 @@ func TestManifestAndDockerfileInOneDirectoryAreOneComponent(t *testing.T) {
 // Dockerfile would have lost the link between its container and its code.
 func TestBuildContextStillJoinsWhenADockerfileIsPresent(t *testing.T) {
 	b := &builder{}
-	b.codebase("manifest", "go", "acme/checkout", "services/checkout", false, nil)
-	b.codebase("dockerfile", "go", "checkout", "services/checkout", true, nil)
-	b.node(schema.KindService, "compose", "shop", "checkout", schema.Attrs{
+	b.codebase("", "acme/checkout", "services/checkout", false, nil)
+	b.codebase("", "checkout", "services/checkout", true, nil)
+	b.node(schema.KindService, "shop", "checkout", schema.Attrs{
 		"image":        "checkout:1",
 		"buildContext": "services/checkout",
 	})
@@ -88,29 +88,12 @@ func TestBuildContextStillJoinsWhenADockerfileIsPresent(t *testing.T) {
 	}
 }
 
-// Only the directory decides. Dockerfile beside Dockerfile.debug is a variant
-// of one service, and when the two disagree about the runtime they do not even
-// share an identifier -- but they still share a directory, which is what says
-// they are one thing.
-func TestTwoDerivedNamesInOneDirectoryCollapse(t *testing.T) {
-	b := &builder{}
-	b.codebase("dockerfile", "csharp", "cartservice", "src/cartservice/src", true,
-		schema.Attrs{"dockerfile": "Dockerfile"})
-	b.codebase("dockerfile", "container", "cartservice", "src/cartservice/src", true,
-		schema.Attrs{"baseImage": "alpine:3.20"})
-
-	r := b.run()
-	if len(r.Nodes) != 1 {
-		t.Fatalf("nodes = %d, want 1: %+v", len(r.Nodes), r.Nodes)
-	}
-}
-
 // A directory in a different tree is a different directory, whatever it is
 // called. This fold never reaches across one.
 func TestSameNameInDifferentDirectoriesIsNotFolded(t *testing.T) {
 	b := &builder{}
-	b.codebase("manifest", "go", "worker", "a/worker", false, nil)
-	b.codebase("dockerfile", "go", "worker", "b/worker", true, nil)
+	b.codebase("", "worker", "a/worker", false, nil)
+	b.codebase("", "worker", "b/worker", true, nil)
 
 	r := b.run()
 	if len(r.Nodes) != 2 {
@@ -123,9 +106,9 @@ func TestSameNameInDifferentDirectoriesIsNotFolded(t *testing.T) {
 // worse than drawing two.
 func TestAmbiguousDirectoryIsReportedRatherThanGuessed(t *testing.T) {
 	b := &builder{}
-	b.codebase("manifest", "go", "acme/api", "app", false, nil)
-	b.codebase("manifest", "javascript", "acme-web", "app", false, nil)
-	b.codebase("dockerfile", "go", "app", "app", true, nil)
+	b.codebase("", "acme/api", "app", false, nil)
+	b.codebase("", "acme-web", "app", false, nil)
+	b.codebase("", "app", "app", true, nil)
 
 	r := b.run()
 	if len(r.Nodes) != 3 {
@@ -140,8 +123,8 @@ func TestAmbiguousDirectoryIsReportedRatherThanGuessed(t *testing.T) {
 // and were drawn as two before this fold existed.
 func TestTwoDeclaredNamesAreLeftAlone(t *testing.T) {
 	b := &builder{}
-	b.codebase("manifest", "go", "acme/api", "app", false, nil)
-	b.codebase("manifest", "javascript", "acme-web", "app", false, nil)
+	b.codebase("", "acme/api", "app", false, nil)
+	b.codebase("", "acme-web", "app", false, nil)
 
 	r := b.run()
 	if len(r.Nodes) != 2 {
@@ -156,8 +139,8 @@ func TestTwoDeclaredNamesAreLeftAlone(t *testing.T) {
 // thing merged away -- even when it names the directory it was built from.
 func TestADeploymentIsNotFoldedAwayByItsOwnBuildDirectory(t *testing.T) {
 	b := &builder{}
-	b.codebase("dockerfile", "go", "api", "api", true, nil)
-	b.node(schema.KindService, "compose", "shop", "api", schema.Attrs{
+	b.codebase("", "api", "api", true, nil)
+	b.node(schema.KindService, "shop", "api", schema.Attrs{
 		"image": "api:1", "directory": "api",
 	})
 
@@ -176,9 +159,9 @@ func TestADeploymentIsNotFoldedAwayByItsOwnBuildDirectory(t *testing.T) {
 // the fold, not to the node that was absorbed.
 func TestDirectoryHintsBindToTheSurvivor(t *testing.T) {
 	b := &builder{}
-	b.codebase("manifest", "javascript", "storefront", ".", false, nil)
-	b.codebase("dockerfile", "javascript", "app", ".", true, nil)
-	b.node(schema.KindDatastore, "compose", "shop", "orders-db", nil)
+	b.codebase("", "storefront", ".", false, nil)
+	b.codebase("", "app", ".", true, nil)
+	b.node(schema.KindDatastore, "shop", "orders-db", nil)
 	b.hint(envHint(".", "postgres://orders-db:5432/app", []string{"orders-db"}, schema.EdgePersistsTo))
 
 	r := b.run()
@@ -192,9 +175,9 @@ func TestDirectoryHintsBindToTheSurvivor(t *testing.T) {
 // last.
 func TestTheSurvivorsOwnFactsAreNotOverwritten(t *testing.T) {
 	b := &builder{}
-	b.codebase("manifest", "go", "acme/api", "api", false,
+	b.codebase("", "acme/api", "api", false,
 		schema.Attrs{"baseImage": "golang:1.22", "ports": []int{8080}})
-	b.codebase("dockerfile", "go", "api", "api", true,
+	b.codebase("", "api", "api", true,
 		schema.Attrs{"baseImage": "alpine:3.20", "ports": []int{9999}})
 
 	n := b.run().node(t, "acme/api")
@@ -210,9 +193,9 @@ func TestTheSurvivorsOwnFactsAreNotOverwritten(t *testing.T) {
 // the one that survived. Dropping it would make the fold cost an edge.
 func TestEdgesIntoTheAbsorbedComponentAreRewritten(t *testing.T) {
 	b := &builder{}
-	b.codebase("manifest", "go", "acme/api", "api", false, nil)
-	absorbed := b.codebase("dockerfile", "go", "api", "api", true, nil)
-	caller := b.node(schema.KindService, "compose", "shop", "gateway", nil)
+	b.codebase("", "acme/api", "api", false, nil)
+	absorbed := b.codebase("", "api", "api", true, nil)
+	caller := b.node(schema.KindService, "shop", "gateway", nil)
 
 	b.in.Edges = append(b.in.Edges, schema.Edge{
 		From: caller, To: absorbed, Kind: schema.EdgeCalls, Confidence: schema.ConfDeclared,
@@ -230,16 +213,16 @@ func TestEdgesIntoTheAbsorbedComponentAreRewritten(t *testing.T) {
 // chain has to resolve all the way through or a node survives with no edges.
 func TestDockerfileManifestAndDeploymentCollapseToOne(t *testing.T) {
 	b := &builder{}
-	b.codebase("manifest", "go", "acme/checkout", "services/checkout", false, nil)
-	b.codebase("dockerfile", "go", "checkout", "services/checkout", true,
+	b.codebase("", "acme/checkout", "services/checkout", false, nil)
+	b.codebase("", "checkout", "services/checkout", true,
 		schema.Attrs{"baseImage": "gcr.io/distroless/static", "ports": []int{8080}})
-	deployment := b.node(schema.KindService, "compose", "shop", "checkout", schema.Attrs{
+	deployment := b.node(schema.KindService, "shop", "checkout", schema.Attrs{
 		"image": "checkout:1", "buildContext": "services/checkout",
 	})
 	b.in.Nodes[len(b.in.Nodes)-1].Sources = []schema.Source{
 		{Extractor: "compose", Path: "docker-compose.yml", Line: 2},
 	}
-	db := b.node(schema.KindDatastore, "compose", "shop", "orders-db", nil)
+	db := b.node(schema.KindDatastore, "shop", "orders-db", nil)
 	b.in.Edges = append(b.in.Edges, schema.Edge{
 		From: deployment, To: db, Kind: schema.EdgePersistsTo, Confidence: schema.ConfDeclared,
 		Evidence: []schema.Evidence{{Extractor: "compose", Rule: "compose_depends_on"}},
@@ -270,102 +253,60 @@ func TestDockerfileManifestAndDeploymentCollapseToOne(t *testing.T) {
 // A codebase with no directory is not a candidate for a fold keyed on one.
 func TestNodesWithoutADirectoryAreNotFolded(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindService, "k8s", "prod", "api", schema.Attrs{"nameFrom": "directory"})
-	b.node(schema.KindService, "k8s", "prod", "other", nil)
+	b.node(schema.KindService, "prod", "api", schema.Attrs{"nameFrom": "directory"})
+	b.node(schema.KindService, "prod", "other", nil)
 
 	if got := len(b.run().Nodes); got != 2 {
 		t.Errorf("nodes = %d, want 2", got)
 	}
 }
 
-// The case this fold exists for. docker-compose.yml gives carts-db an image
-// and it becomes a datastore; docker-compose.logging.yml mentions the same
-// service to attach a log driver, names no image, and gets the fallback. One
-// Compose project cannot hold two services called carts-db.
-func TestOneFormatDisagreeingAboutKindIsOneComponent(t *testing.T) {
+// Identity now carries the scope and not the extractor, so two files in one
+// directory that describe one codebase already share an identifier and are
+// merged before the resolver sees them. What is left for this fold is the
+// case the identifier cannot reach: a declared name and a derived one, which
+// are different names and therefore different identifiers.
+//
+// The cases that used to live here -- two readings disagreeing about kind, and
+// two Dockerfiles in one directory -- moved to the builder, which is where the
+// choice is now made. See pkg/schema/builder_kind_test.go.
+
+// A chart and a cluster manifest may describe one component or two, and
+// neither file answers that. The scope keeps them apart, and this pins that it
+// is deliberate rather than forgotten.
+func TestTwoScopesNamingOneThingAreNotFolded(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindDatastore, "compose", "docker-compose", "carts-db",
-		schema.Attrs{"image": "mongo:3.4"})
-	b.node(schema.KindService, "compose", "docker-compose", "carts-db", nil)
-
-	r := b.run()
-	if len(r.Nodes) != 1 {
-		t.Fatalf("nodes = %d, want 1: %+v", len(r.Nodes), r.Nodes)
-	}
-	// The node that named an image is where the kind came from; the other was
-	// not classified, it was defaulted.
-	if r.Nodes[0].Kind != schema.KindDatastore {
-		t.Errorf("Kind = %q, want datastore", r.Nodes[0].Kind)
-	}
-}
-
-// Which one survives cannot depend on the order they arrived in, or two scans
-// of one tree disagree.
-func TestTheClassifiedNodeSurvivesWhicheverOrderTheyArrive(t *testing.T) {
-	for _, reversed := range []bool{false, true} {
-		b := &builder{}
-		if reversed {
-			b.node(schema.KindService, "compose", "shop", "queue", nil)
-			b.node(schema.KindQueue, "compose", "shop", "queue", schema.Attrs{"image": "rabbitmq:3"})
-		} else {
-			b.node(schema.KindQueue, "compose", "shop", "queue", schema.Attrs{"image": "rabbitmq:3"})
-			b.node(schema.KindService, "compose", "shop", "queue", nil)
-		}
-		r := b.run()
-		if len(r.Nodes) != 1 || r.Nodes[0].Kind != schema.KindQueue {
-			t.Errorf("reversed=%v gave %+v, want one queue", reversed, r.Nodes)
-		}
-	}
-}
-
-// A namespace, a Compose project and a chart are named after what they
-// contain. Folding a boundary into its own contents would collapse the
-// containment the graph is built on.
-func TestABoundaryIsNotFoldedIntoWhatItContains(t *testing.T) {
-	b := &builder{}
-	b.node(schema.KindBoundary, "helm", "helm-chart", "helm-chart", nil)
-	b.node(schema.KindService, "helm", "helm-chart", "helm-chart", nil)
-
-	if got := len(b.run().Nodes); got != 2 {
-		t.Errorf("nodes = %d, want 2: a chart is not the workload it deploys", got)
-	}
-}
-
-// The boundary this fold must not reach across. Two declared projects each
-// holding a "prod" namespace and an "api" are not one api.
-func TestKindConflictFoldStaysInsideOneProject(t *testing.T) {
-	b := &builder{}
-	b.node(schema.KindDatastore, "k8s", "prod", "db",
-		schema.Attrs{"image": "postgres:16", "project": "samples/alpha"})
-	b.node(schema.KindService, "k8s", "prod", "db",
-		schema.Attrs{"project": "samples/beta"})
-
-	if got := len(b.run().Nodes); got != 2 {
-		t.Errorf("nodes = %d, want 2: two projects are two systems", got)
-	}
-}
-
-// Whether a chart and a cluster manifest describe one component or two is a
-// question neither file answers, so this fold does not answer it either. The
-// gap is pinned rather than left to be discovered again.
-func TestTwoFormatsNamingOneThingAreNotFolded(t *testing.T) {
-	b := &builder{}
-	b.node(schema.KindService, "helm", "helm-chart", "adservice", nil)
-	b.node(schema.KindService, "k8s", "default", "adservice", nil)
+	b.node(schema.KindService, "onlineboutique", "adservice", nil)
+	b.node(schema.KindService, "prod", "adservice", nil)
 
 	if got := len(b.run().Nodes); got != 2 {
 		t.Errorf("nodes = %d, want 2 until this is decided deliberately", got)
 	}
 }
 
-// Two namespaces of one format are two deployments of one service, which is
-// what a dev and a prod overlay are. Names alone must not fold them.
-func TestOneFormatInTwoNamespacesIsNotFolded(t *testing.T) {
+// Two scopes of one name are two deployments of one service, which is what a
+// dev and a prod overlay are. Names alone must not fold them.
+func TestTwoDeploymentsOfOneServiceAreNotFolded(t *testing.T) {
 	b := &builder{}
-	b.node(schema.KindDatastore, "k8s", "dev", "db", schema.Attrs{"image": "postgres:16"})
-	b.node(schema.KindService, "k8s", "prod", "db", nil)
+	b.node(schema.KindDatastore, "dev", "db", schema.Attrs{"image": "postgres:16"})
+	b.node(schema.KindDatastore, "prod", "db", nil)
 
 	if got := len(b.run().Nodes); got != 2 {
 		t.Errorf("nodes = %d, want 2: dev and prod are two deployments", got)
+	}
+}
+
+// The fold keys on the directory and checks no project, and this is why: a
+// directory belongs to exactly one project, so two projects cannot share one.
+// Their codebases sit in different directories and never meet here.
+func TestTwoProjectsCodebasesAreNotFolded(t *testing.T) {
+	b := &builder{}
+	b.codebase("", "acme/api", "alpha/app", false, nil)
+	b.in.Nodes[len(b.in.Nodes)-1].Project = "samples/alpha"
+	b.codebase("", "api", "beta/app", true, nil)
+	b.in.Nodes[len(b.in.Nodes)-1].Project = "samples/beta"
+
+	if got := len(b.run().Nodes); got != 2 {
+		t.Errorf("nodes = %d, want 2: two projects are two systems", got)
 	}
 }

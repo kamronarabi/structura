@@ -75,7 +75,7 @@ func rotations[T any](in []T) [][]T {
 }
 
 func nodeID(name string) string {
-	return schema.NewNodeID(schema.KindService, "compose", "app", name)
+	return schema.NewNodeID(schema.KindService, "app", name)
 }
 
 func TestEvidenceOrderDoesNotChangeTheGraph(t *testing.T) {

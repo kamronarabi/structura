@@ -202,10 +202,14 @@ func (idx *Index) Resolve(h Hint, from *Identity) (Match, bool) {
 			// reported as ambiguous instead of resolved.
 			narrowed := idx.tieBreak(candidates, h, from)
 			if len(narrowed) == 1 {
+				// Charged the same as the local path: a decision costs the
+				// same wherever it was made. This went unpaid for as long as
+				// the only fixture that reached it put both candidates in one
+				// scope, which the identifier no longer permits.
 				return Match{
 					NodeID:     narrowed[0],
 					Rule:       rule.name + "+scoped",
-					Confidence: confidence,
+					Confidence: confidence - scopedPenalty,
 				}, true
 			}
 			return Match{Rule: rule.name, Candidates: candidates}, false

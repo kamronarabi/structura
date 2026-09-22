@@ -897,7 +897,7 @@ type projectCount struct {
 func projectCounts(g schema.Graph) []projectCount {
 	counts := map[string]int{}
 	for _, n := range g.Nodes {
-		name, _ := n.Attrs["project"].(string)
+		name := n.Project
 		if name == "" {
 			name = "."
 		}

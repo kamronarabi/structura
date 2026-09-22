@@ -149,7 +149,7 @@ spec:
 	if api.Namespace != "prod" {
 		t.Errorf("namespace = %q, want prod", api.Namespace)
 	}
-	if api.ID != "service:k8s/prod/api" {
+	if api.ID != "container:@prod/api" {
 		t.Errorf("id = %q", api.ID)
 	}
 	if api.Attrs["replicas"] != 3 {
@@ -569,7 +569,9 @@ spec:
 		if e.Kind != schema.EdgeContains {
 			continue
 		}
-		if !strings.HasPrefix(e.From, "boundary:") {
+		// A boundary is context level, which is what the identifier records;
+		// the kind itself is not in there, because it is inferred.
+		if !strings.HasPrefix(e.From, string(schema.LayerContext)+":") {
 			t.Errorf("a contains edge starts at %q, which is not a boundary", e.From)
 		}
 		if e.Confidence != schema.ConfDeclared {

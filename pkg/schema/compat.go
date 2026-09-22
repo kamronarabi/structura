@@ -37,14 +37,25 @@ import (
 // them as the same: a clarification must not invalidate every cached graph in
 // the world.
 //
-// # The pre-1.0 promise
+// # 1.0.0
 //
-// SemVer permits 0.x minors to break. Structura does not take that
-// permission. The rules above hold at 0.x exactly as they would at 1.x,
-// because graph.json is committed to repositories and read by builds that are
-// not the one that wrote it -- the situation SemVer exists to govern. If a
-// genuine break becomes necessary before the format stabilizes, it goes to
-// 1.0.0 rather than hiding in a 0.x minor.
+// The node ID grammar changed, which is the break this version exists for. It
+// carried the extractor that found a node and the kind the node was taken to
+// be, and neither is a property of the component: a Helm chart and a cluster
+// manifest describing one service produced two identifiers, and a Compose file
+// that named an image produced a different identifier from a sibling that did
+// not. Two fifths of a real repository's nodes were another node again.
+//
+// Identity is now what a component is called and where it lives. Node.Project
+// became a field, Node.Namespace narrowed to a deployment scope, and
+// QualifyNamespace became QualifyProject. See ids.go.
+//
+// It was done before 1.0 rather than after because the policy below gives 0.x
+// no free pass, so the cost was the same either way -- and once graph.json is
+// committed in repositories and read by many CLI versions at once, the cost is
+// a migration for every consumer instead of a regenerated fixture set.
+//
+// # The pre-1.0 promise
 //
 // # Phase 2
 //
@@ -59,7 +70,7 @@ import (
 // avoid. Phase 2 adds what Phase 2 turns out to need, and bumps the minor
 // when it does -- to whatever the next minor is by then, which is why no
 // number is written down here.
-const Version = "0.3.0"
+const Version = "1.0.0"
 
 // Relation describes how one schema version stands to another.
 type Relation string

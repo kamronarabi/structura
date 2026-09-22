@@ -90,7 +90,7 @@ func (e *Extractor) Extract(ctx context.Context, f *scan.File, emit scan.Emitter
 
 	// The project itself is a boundary, which is what gives the context-level
 	// view something to group services under.
-	boundaryID := schema.NewNodeID(schema.KindBoundary, Name, projectName, projectName)
+	boundaryID := schema.NewNodeID(schema.KindBoundary, projectName, projectName)
 	emit.Node(schema.Node{
 		ID:         boundaryID,
 		Kind:       schema.KindBoundary,
@@ -337,7 +337,7 @@ func defaultProjectName(f *scan.File) string {
 
 func nodeID(projectName, serviceName, image string) string {
 	kind, _, _ := classify.ImageKind(image)
-	return schema.NewNodeID(kind, Name, projectName, serviceName)
+	return schema.NewNodeID(kind, projectName, serviceName)
 }
 
 // repoRelativeBuildContext resolves a Compose build context against the

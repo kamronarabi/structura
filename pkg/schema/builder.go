@@ -45,16 +45,34 @@ func (b *Builder) AddNode(n Node) {
 		return
 	}
 
-	// A kind disagreement means two extractors read the same thing as
-	// different types of component. Keeping the first silently would hide a
-	// genuine modeling gap, so it is reported.
+	// A kind disagreement means two files read the same thing as different
+	// types of component, and one of the two readings is usually just
+	// uninformed: a Compose file that names an image of mongo produces a
+	// datastore, while a sibling file mentioning the same service to attach a
+	// log driver names no image and produces the service fallback.
+	//
+	// So the better-informed reading wins rather than the first one. Taking
+	// the first was safe while the kind was part of the identifier, because
+	// the two never met; now they merge, and sorted path order would have
+	// handed carts-db to docker-compose.logging.yml.
+	//
+	// Swapping the kind cannot invalidate the identifier, because only the
+	// layer is in it and every kind that maps to one layer produces the same
+	// identifier. Two readings that disagree about the layer never merge.
 	if existing.Kind != n.Kind {
+		was, kept := existing.Kind, existing.Kind
+		if betterClassified(&n, existing) {
+			kept = n.Kind
+			existing.Kind = n.Kind
+			existing.Layer = LayerOf(n.Kind)
+		}
 		b.Diag(Diagnostic{
-			Severity: SeverityWarn,
+			Severity: SeverityInfo,
 			Code:     "node_kind_conflict",
 			Path:     firstPath(n.Sources),
-			Message: fmt.Sprintf("%s was extracted as %q and also as %q; keeping %q",
-				n.ID, existing.Kind, n.Kind, existing.Kind),
+			Message: fmt.Sprintf("%s was read as %q and also as %q; keeping %q, "+
+				"which is the reading that identified what it runs",
+				n.ID, was, n.Kind, kept),
 		})
 	}
 
@@ -73,8 +91,18 @@ func (b *Builder) AddNode(n Node) {
 	if incomingWins {
 		existing.Confidence = n.Confidence
 	}
-	if existing.Name == "" {
+	// A declared name beats a derived one. A go.mod states a module; a
+	// Dockerfile can only be named after the directory it sits in and records
+	// that in nameFrom. Both now produce one identifier -- they are keyed on
+	// the same directory -- so without this the winner is whichever file's
+	// path sorts first, and "Dockerfile" sorts before "go.mod".
+	switch {
+	case existing.Name == "":
 		existing.Name = n.Name
+		delete(existing.Attrs, nameFromAttr)
+	case existing.Attrs[nameFromAttr] != nil && n.Attrs[nameFromAttr] == nil && n.Name != "":
+		existing.Name = n.Name
+		delete(existing.Attrs, nameFromAttr)
 	}
 	if existing.Namespace == "" {
 		existing.Namespace = n.Namespace
@@ -242,4 +270,28 @@ func firstPath(sources []Source) string {
 		return ""
 	}
 	return sources[0].Path
+}
+
+// nameFromAttr marks a node whose name was derived from its surroundings
+// rather than declared by the file that described it. The extractor that can
+// only name a component after its directory says so here, and merge uses it to
+// prefer a name somebody actually wrote.
+const nameFromAttr = "nameFrom"
+
+// betterClassified reports whether candidate's kind was established rather
+// than defaulted.
+//
+// A kind comes from recognizing an image, so the node that named one is the
+// node that knows. Where neither did, the more specific kind wins, since
+// service is what a component is called when nothing said otherwise.
+func betterClassified(candidate, current *Node) bool {
+	if hasImage(candidate) != hasImage(current) {
+		return hasImage(candidate)
+	}
+	return current.Kind == KindService && candidate.Kind != KindService
+}
+
+func hasImage(n *Node) bool {
+	image, _ := n.Attrs["image"].(string)
+	return image != ""
 }
