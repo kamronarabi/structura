@@ -1,20 +1,20 @@
 online-boutique
   files       363 scanned, 90 parsed
-  nodes       37
+  nodes       23
   edges       43
-  connected   17 of 33 components
-  clusters    19
-  redundant   14 of 37 nodes
+  connected   16 of 19 components
+  clusters    5
+  redundant   0 of 23 nodes
 
   nodes by kind
     boundary                           4
-    cloud_resource                     4
+    cloud_resource                     3
     datastore                          2
     external                           1
-    service                            26
+    service                            13
 
   nodes by layer
-    container                          32
+    container                          18
     context                            5
 
   edges by kind
@@ -31,20 +31,7 @@ online-boutique
     terraform_reference                2
 
   components drawn more than once
-    adservice                          2
-    cartservice                        2
-    checkoutservice                    2
-    currencyservice                    2
-    emailservice                       2
-    enable_google_apis                 2
-    frontend                           2
-    loadgenerator                      2
-    opentelemetrycollector             2
-    paymentservice                     2
-    productcatalogservice              2
-    recommendationservice              2
-    shippingservice                    2
-    shoppingassistantservice           2
+    (none)
 
   diagnostics
     info code_joined_to_deployment     12

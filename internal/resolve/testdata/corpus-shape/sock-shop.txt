@@ -1,20 +1,20 @@
 sock-shop
   files       197 scanned, 104 parsed
-  nodes       71
+  nodes       70
   edges       76
-  connected   30 of 63 components
-  clusters    18
-  redundant   17 of 71 nodes
+  connected   30 of 62 components
+  clusters    16
+  redundant   16 of 70 nodes
 
   nodes by kind
     boundary                           8
     cloud_resource                     3
     datastore                          7
     queue                              2
-    service                            51
+    service                            50
 
   nodes by layer
-    container                          63
+    container                          62
     context                            8
 
   edges by kind
@@ -26,13 +26,11 @@ sock-shop
   edges by rule
     compose_depends_on                 20
     compose_project_member             23
-    dns_exact                          2
+    dns_exact                          3
     k8s_namespace_member               28
-    name_exact                         1
     terraform_reference                2
 
   components drawn more than once
-    alertmanager                       2
     carts                              2
     carts-db                           2
     catalogue                          2

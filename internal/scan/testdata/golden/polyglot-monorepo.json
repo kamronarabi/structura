@@ -1,17 +1,16 @@
 {
   "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:e61c9e4c7d263a32b16ea289879d4a066ea3279718198fb8c2889184cad715a4",
+  "contentHash": "sha256:7439b9227cfd38f529abf8f8406766fe31955d1c46c4bee1948b1c6d1ec4b090",
   "root": {
     "name": "polyglot-monorepo"
   },
   "nodes": [
     {
-      "id": "container:@shop/broker",
+      "id": "container:broker",
       "kind": "queue",
       "layer": "container",
       "name": "broker",
-      "namespace": "shop",
       "tech": {
         "runtime": "container",
         "framework": "amqp"
@@ -29,11 +28,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@shop/cache",
+      "id": "container:cache",
       "kind": "datastore",
       "layer": "container",
       "name": "cache",
-      "namespace": "shop",
       "tech": {
         "runtime": "container",
         "framework": "redis"
@@ -51,11 +49,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@shop/checkout",
+      "id": "container:checkout",
       "kind": "service",
       "layer": "container",
       "name": "checkout",
-      "namespace": "shop",
       "tech": {
         "language": "go",
         "runtime": "container",
@@ -84,11 +81,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@shop/gateway",
+      "id": "container:gateway",
       "kind": "service",
       "layer": "container",
       "name": "gateway",
-      "namespace": "shop",
       "tech": {
         "language": "go",
         "runtime": "container",
@@ -120,11 +116,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@shop/orders-db",
+      "id": "container:orders-db",
       "kind": "datastore",
       "layer": "container",
       "name": "orders-db",
-      "namespace": "shop",
       "tech": {
         "runtime": "container",
         "framework": "postgresql"
@@ -202,23 +197,6 @@
       "confidence": 0.8
     },
     {
-      "id": "context:@shop/shop",
-      "kind": "boundary",
-      "layer": "context",
-      "name": "shop",
-      "attrs": {
-        "orchestrator": "docker-compose"
-      },
-      "sources": [
-        {
-          "extractor": "compose",
-          "path": "deploy/docker-compose.yml",
-          "line": 1
-        }
-      ],
-      "confidence": 1
-    },
-    {
       "id": "context:sentry",
       "kind": "external",
       "layer": "context",
@@ -235,6 +213,23 @@
         }
       ],
       "confidence": 0.4
+    },
+    {
+      "id": "context:shop",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "shop",
+      "attrs": {
+        "orchestrator": "docker-compose"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "deploy/docker-compose.yml",
+          "line": 1
+        }
+      ],
+      "confidence": 1
     },
     {
       "id": "context:stripe",
@@ -257,9 +252,9 @@
   ],
   "edges": [
     {
-      "id": "e:c10400bbdc2d",
-      "from": "container:@shop/checkout",
-      "to": "container:@shop/broker",
+      "id": "e:9c163f4b9c11",
+      "from": "container:checkout",
+      "to": "container:broker",
       "kind": "publishes_to",
       "protocol": "amqp",
       "confidence": 1,
@@ -281,9 +276,9 @@
       ]
     },
     {
-      "id": "e:6e31f8b38fa7",
-      "from": "container:@shop/checkout",
-      "to": "container:@shop/orders-db",
+      "id": "e:0d14e2199e5c",
+      "from": "container:checkout",
+      "to": "container:orders-db",
       "kind": "persists_to",
       "protocol": "postgres",
       "confidence": 1,
@@ -305,9 +300,9 @@
       ]
     },
     {
-      "id": "e:f6413ed5a40b",
-      "from": "container:@shop/gateway",
-      "to": "container:@shop/cache",
+      "id": "e:b76ed3d14f31",
+      "from": "container:gateway",
+      "to": "container:cache",
       "kind": "persists_to",
       "protocol": "redis",
       "confidence": 1,
@@ -329,9 +324,9 @@
       ]
     },
     {
-      "id": "e:7ecdfafa39df",
-      "from": "container:@shop/gateway",
-      "to": "container:@shop/checkout",
+      "id": "e:6e6da23142b1",
+      "from": "container:gateway",
+      "to": "container:checkout",
       "kind": "calls",
       "protocol": "http",
       "confidence": 1,
@@ -347,14 +342,14 @@
           "extractor": "compose",
           "path": "deploy/docker-compose.yml",
           "line": 6,
-          "rule": "name_exact",
-          "detail": "env CHECKOUT_URL=http://checkout:9090 (resolves to checkout)"
+          "rule": "dns_exact",
+          "detail": "env CHECKOUT_URL=http://checkout:9090 (resolves to github.com/acme/shop/checkout)"
         }
       ]
     },
     {
-      "id": "e:817440c8c02a",
-      "from": "container:@shop/gateway",
+      "id": "e:3a284ecbdb10",
+      "from": "container:gateway",
       "to": "context:stripe",
       "kind": "calls",
       "protocol": "https",
@@ -387,9 +382,9 @@
       ]
     },
     {
-      "id": "e:3dd5b26a93eb",
-      "from": "context:@shop/shop",
-      "to": "container:@shop/broker",
+      "id": "e:3dc0d7cc1523",
+      "from": "context:shop",
+      "to": "container:broker",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -403,9 +398,9 @@
       ]
     },
     {
-      "id": "e:54f41a2a90e3",
-      "from": "context:@shop/shop",
-      "to": "container:@shop/cache",
+      "id": "e:57d99bc341a0",
+      "from": "context:shop",
+      "to": "container:cache",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -419,9 +414,9 @@
       ]
     },
     {
-      "id": "e:c7379037a21c",
-      "from": "context:@shop/shop",
-      "to": "container:@shop/checkout",
+      "id": "e:be851ba4d867",
+      "from": "context:shop",
+      "to": "container:checkout",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -435,9 +430,9 @@
       ]
     },
     {
-      "id": "e:7588b699f8a2",
-      "from": "context:@shop/shop",
-      "to": "container:@shop/gateway",
+      "id": "e:1f1b3c549e71",
+      "from": "context:shop",
+      "to": "container:gateway",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -451,9 +446,9 @@
       ]
     },
     {
-      "id": "e:5f34ca2262b3",
-      "from": "context:@shop/shop",
-      "to": "container:@shop/orders-db",
+      "id": "e:c3696129c597",
+      "from": "context:shop",
+      "to": "container:orders-db",
       "kind": "contains",
       "confidence": 1,
       "evidence": [

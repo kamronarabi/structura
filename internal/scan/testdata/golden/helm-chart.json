@@ -1,17 +1,16 @@
 {
   "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:688a94e4b7bc10222fa7372c5f526c29c39575180ea408fdd1c88bf7a50b24e8",
+  "contentHash": "sha256:bb9b252ff6c27ca9ae984980f73eefe0b4d133cfb520ff344f61a6719591b248",
   "root": {
     "name": "helm-chart"
   },
   "nodes": [
     {
-      "id": "container:@api/api",
+      "id": "container:api",
       "kind": "service",
       "layer": "container",
       "name": "api",
-      "namespace": "api",
       "tech": {
         "runtime": "kubernetes"
       },
@@ -33,11 +32,10 @@
       "confidence": 0.4
     },
     {
-      "id": "container:@api/postgresql",
+      "id": "container:postgresql",
       "kind": "datastore",
       "layer": "container",
       "name": "postgresql",
-      "namespace": "api",
       "tech": {
         "runtime": "kubernetes",
         "framework": "postgresql"
@@ -58,11 +56,10 @@
       "confidence": 0.95
     },
     {
-      "id": "container:@api/redis",
+      "id": "container:redis",
       "kind": "datastore",
       "layer": "container",
       "name": "redis",
-      "namespace": "api",
       "tech": {
         "runtime": "kubernetes",
         "framework": "redis"
@@ -83,11 +80,10 @@
       "confidence": 0.95
     },
     {
-      "id": "context:@api/api",
+      "id": "context:api",
       "kind": "boundary",
       "layer": "context",
       "name": "api",
-      "namespace": "api",
       "attrs": {
         "appVersion": "1.2.0",
         "chartVersion": "0.3.1",
@@ -122,9 +118,9 @@
   ],
   "edges": [
     {
-      "id": "e:c859e03df178",
-      "from": "container:@api/api",
-      "to": "container:@api/postgresql",
+      "id": "e:82d92d4afef0",
+      "from": "container:api",
+      "to": "container:postgresql",
       "kind": "persists_to",
       "protocol": "postgres",
       "confidence": 0.8,
@@ -139,8 +135,8 @@
       ]
     },
     {
-      "id": "e:9e1fe675f8ee",
-      "from": "container:@api/api",
+      "id": "e:ea239ed51ecf",
+      "from": "container:api",
       "to": "context:api.acme.example.com",
       "kind": "calls",
       "confidence": 0.8,
@@ -154,9 +150,9 @@
       ]
     },
     {
-      "id": "e:8d77ef9ac4c6",
-      "from": "context:@api/api",
-      "to": "container:@api/postgresql",
+      "id": "e:47fca6079016",
+      "from": "context:api",
+      "to": "container:postgresql",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -170,9 +166,9 @@
       ]
     },
     {
-      "id": "e:53a650f7a0d7",
-      "from": "context:@api/api",
-      "to": "container:@api/redis",
+      "id": "e:c808afed3b02",
+      "from": "context:api",
+      "to": "container:redis",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -204,7 +200,7 @@
       "code": "unresolved_reference",
       "path": "charts/api/values.yaml",
       "line": 14,
-      "message": "\"api.api\" refers to \"api-redis-master\", which matches no component in this repository"
+      "message": "\"api\" refers to \"api-redis-master\", which matches no component in this repository"
     }
   ],
   "stats": {

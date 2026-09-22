@@ -1,49 +1,50 @@
 bitnami-charts
   files       4122 scanned, 3185 parsed
-  nodes       417
-  edges       190
-  connected   7 of 302 components
-  clusters    227
-  redundant   291 of 417 nodes
+  nodes       241
+  edges       194
+  connected   11 of 126 components
+  clusters    96
+  redundant   115 of 241 nodes
 
   nodes by kind
     boundary                           115
     cloud_resource                     3
-    datastore                          83
+    datastore                          26
     external                           3
-    queue                              5
-    service                            208
+    queue                              3
+    service                            91
 
   nodes by layer
-    container                          299
+    container                          123
     context                            118
 
   edges by kind
-    calls                              4
+    calls                              8
     contains                           186
 
   edges by rule
     dns_exact                          1
     external_host                      3
     helm_chart_dependency              186
+    name_exact                         4
 
   components drawn more than once
     airflow                            2
-    apache                             3
+    apache                             2
     apisix                             2
     appsmith                           2
     argo-cd                            2
     argo-workflows                     2
     aspnet-core                        2
     cadvisor                           2
-    cassandra                          6
+    cassandra                          2
     cert-manager                       2
     chainloop                          2
     cilium                             2
     clickhouse                         2
     clickhouse-operator                2
     cloudnative-pg                     2
-    common                             114
+    common                             2
     concourse                          2
     consul                             2
     contour                            2
@@ -52,9 +53,9 @@ bitnami-charts
     dremio                             2
     drupal                             2
     ejbca                              2
-    elasticsearch                      3
+    elasticsearch                      2
     envoy-gateway                      2
-    etcd                               5
+    etcd                               2
     external-dns                       2
     flink                              2
     fluent-bit                         2
@@ -77,53 +78,50 @@ bitnami-charts
     janusgraph                         2
     jenkins                            2
     jupyterhub                         2
-    kafka                              4
+    kafka                              2
     keycloak                           2
     keydb                              2
-    kibana                             3
+    kibana                             2
     kong                               2
     kube-arangodb                      2
     kube-prometheus                    2
     kube-prometheus-crds               2
-    kube-state-metrics                 3
+    kube-state-metrics                 2
     kuberay                            2
     kubernetes-event-exporter          2
     logstash                           2
-    mariadb                            10
+    mariadb                            2
     mariadb-galera                     2
     mastodon                           2
     matomo                             2
-    memcached                          4
-    memcachedchunks                    2
-    memcachedfrontend                  2
+    memcached                          2
     metallb                            2
     metrics-server                     2
     milvus                             2
-    minio                              6
     mlflow                             2
-    mongodb                            4
+    mongodb                            2
     mongodb-sharded                    2
     moodle                             2
     multus-cni                         2
-    mysql                              4
+    mysql                              2
     nats                               2
     neo4j                              2
     nessie                             2
     nginx                              2
-    node-exporter                      3
+    node-exporter                      2
     oauth2-proxy                       2
     odoo                               2
     opensearch                         2
     parse                              2
     phpmyadmin                         2
     pinniped                           2
-    postgresql                         20
+    postgresql                         2
     postgresql-ha                      2
     prometheus                         2
     pytorch                            2
     rabbitmq                           2
     rabbitmq-cluster-operator          2
-    redis                              10
+    redis                              2
     redis-cluster                      2
     redmine                            2
     schema-registry                    2
@@ -139,17 +137,16 @@ bitnami-charts
     tomcat                             2
     valkey                             2
     valkey-cluster                     2
-    vault                              3
+    vault                              2
     victoriametrics                    2
     whereabouts                        2
     wildfly                            2
     wordpress                          2
     zipkin                             2
-    zookeeper                          4
+    zookeeper                          2
 
   diagnostics
     info helm_values_inferred          113
-    info out_of_scope_reference        7
-    info unresolved_reference          103
+    info unresolved_reference          106
     warn file_too_large                2
     warn helm_unrendered               113

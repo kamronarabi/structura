@@ -1,17 +1,16 @@
 {
   "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:9c18fc8ebcb4684f6458ad1830f269315f752f3fd10364b52f50a4b82d0daf45",
+  "contentHash": "sha256:4747c1df2a01a44190acb9e76ffe8b402e9aaa9103e9ab3bcf11c0c325760942",
   "root": {
     "name": "compose-monolith"
   },
   "nodes": [
     {
-      "id": "container:@shopfront/cache",
+      "id": "container:cache",
       "kind": "datastore",
       "layer": "container",
       "name": "cache",
-      "namespace": "shopfront",
       "tech": {
         "runtime": "container",
         "framework": "redis"
@@ -32,11 +31,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@shopfront/db",
+      "id": "container:db",
       "kind": "datastore",
       "layer": "container",
       "name": "db",
-      "namespace": "shopfront",
       "tech": {
         "runtime": "container",
         "framework": "postgresql"
@@ -57,11 +55,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@shopfront/queue",
+      "id": "container:queue",
       "kind": "queue",
       "layer": "container",
       "name": "queue",
-      "namespace": "shopfront",
       "tech": {
         "runtime": "container",
         "framework": "amqp"
@@ -83,11 +80,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@shopfront/search",
+      "id": "container:search",
       "kind": "datastore",
       "layer": "container",
       "name": "search",
-      "namespace": "shopfront",
       "tech": {
         "runtime": "container",
         "framework": "elasticsearch"
@@ -105,11 +101,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@shopfront/web",
+      "id": "container:web",
       "kind": "service",
       "layer": "container",
       "name": "web",
-      "namespace": "shopfront",
       "tech": {
         "runtime": "container"
       },
@@ -131,11 +126,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@shopfront/worker",
+      "id": "container:worker",
       "kind": "service",
       "layer": "container",
       "name": "worker",
-      "namespace": "shopfront",
       "tech": {
         "runtime": "container"
       },
@@ -148,23 +142,6 @@
           "extractor": "compose",
           "path": "docker-compose.yml",
           "line": 23
-        }
-      ],
-      "confidence": 1
-    },
-    {
-      "id": "context:@shopfront/shopfront",
-      "kind": "boundary",
-      "layer": "context",
-      "name": "shopfront",
-      "attrs": {
-        "orchestrator": "docker-compose"
-      },
-      "sources": [
-        {
-          "extractor": "compose",
-          "path": "docker-compose.yml",
-          "line": 1
         }
       ],
       "confidence": 1
@@ -186,13 +163,30 @@
         }
       ],
       "confidence": 0.8
+    },
+    {
+      "id": "context:shopfront",
+      "kind": "boundary",
+      "layer": "context",
+      "name": "shopfront",
+      "attrs": {
+        "orchestrator": "docker-compose"
+      },
+      "sources": [
+        {
+          "extractor": "compose",
+          "path": "docker-compose.yml",
+          "line": 1
+        }
+      ],
+      "confidence": 1
     }
   ],
   "edges": [
     {
-      "id": "e:ebef8764d3d1",
-      "from": "container:@shopfront/web",
-      "to": "container:@shopfront/cache",
+      "id": "e:83ca598c0b6d",
+      "from": "container:web",
+      "to": "container:cache",
       "kind": "persists_to",
       "protocol": "redis",
       "confidence": 1,
@@ -214,9 +208,9 @@
       ]
     },
     {
-      "id": "e:4a7482e75091",
-      "from": "container:@shopfront/web",
-      "to": "container:@shopfront/db",
+      "id": "e:ef8d1b014bb6",
+      "from": "container:web",
+      "to": "container:db",
       "kind": "persists_to",
       "protocol": "postgres",
       "confidence": 1,
@@ -238,9 +232,9 @@
       ]
     },
     {
-      "id": "e:d697788fbc7a",
-      "from": "container:@shopfront/web",
-      "to": "container:@shopfront/search",
+      "id": "e:e99a1162c5fd",
+      "from": "container:web",
+      "to": "container:search",
       "kind": "persists_to",
       "confidence": 0.8,
       "evidence": [
@@ -254,8 +248,8 @@
       ]
     },
     {
-      "id": "e:7c0c242018f8",
-      "from": "container:@shopfront/web",
+      "id": "e:52f26a58a886",
+      "from": "container:web",
       "to": "context:api.stripe.com",
       "kind": "calls",
       "protocol": "https",
@@ -271,9 +265,9 @@
       ]
     },
     {
-      "id": "e:0effad88e7c5",
-      "from": "container:@shopfront/worker",
-      "to": "container:@shopfront/db",
+      "id": "e:72d6dbd20dc2",
+      "from": "container:worker",
+      "to": "container:db",
       "kind": "persists_to",
       "protocol": "postgres",
       "confidence": 1,
@@ -295,9 +289,9 @@
       ]
     },
     {
-      "id": "e:e16008d880d1",
-      "from": "container:@shopfront/worker",
-      "to": "container:@shopfront/queue",
+      "id": "e:4b677500df0e",
+      "from": "container:worker",
+      "to": "container:queue",
       "kind": "publishes_to",
       "protocol": "amqp",
       "confidence": 1,
@@ -319,9 +313,9 @@
       ]
     },
     {
-      "id": "e:290cd98d6a9e",
-      "from": "context:@shopfront/shopfront",
-      "to": "container:@shopfront/cache",
+      "id": "e:5f5515bc333b",
+      "from": "context:shopfront",
+      "to": "container:cache",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -335,9 +329,9 @@
       ]
     },
     {
-      "id": "e:835b5c9a24f1",
-      "from": "context:@shopfront/shopfront",
-      "to": "container:@shopfront/db",
+      "id": "e:e2878ee2ffe3",
+      "from": "context:shopfront",
+      "to": "container:db",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -351,9 +345,9 @@
       ]
     },
     {
-      "id": "e:7c9b1f10ff66",
-      "from": "context:@shopfront/shopfront",
-      "to": "container:@shopfront/queue",
+      "id": "e:6fa8ea473b62",
+      "from": "context:shopfront",
+      "to": "container:queue",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -367,9 +361,9 @@
       ]
     },
     {
-      "id": "e:14ea71eacc83",
-      "from": "context:@shopfront/shopfront",
-      "to": "container:@shopfront/search",
+      "id": "e:b691761eee53",
+      "from": "context:shopfront",
+      "to": "container:search",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -383,9 +377,9 @@
       ]
     },
     {
-      "id": "e:bcf0061b3e36",
-      "from": "context:@shopfront/shopfront",
-      "to": "container:@shopfront/web",
+      "id": "e:f0f985575568",
+      "from": "context:shopfront",
+      "to": "container:web",
       "kind": "contains",
       "confidence": 1,
       "evidence": [
@@ -399,9 +393,9 @@
       ]
     },
     {
-      "id": "e:5baa6db98ebb",
-      "from": "context:@shopfront/shopfront",
-      "to": "container:@shopfront/worker",
+      "id": "e:107b0f62cb5a",
+      "from": "context:shopfront",
+      "to": "container:worker",
       "kind": "contains",
       "confidence": 1,
       "evidence": [

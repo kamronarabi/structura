@@ -1,17 +1,17 @@
 terraform-aws-vpc
   files       111 scanned, 19 parsed
-  nodes       48
+  nodes       25
   edges       19
-  connected   15 of 47 components
-  clusters    35
-  redundant   23 of 48 nodes
+  connected   14 of 24 components
+  clusters    12
+  redundant   0 of 25 nodes
 
   nodes by kind
     boundary                           1
-    cloud_resource                     47
+    cloud_resource                     24
 
   nodes by layer
-    container                          47
+    container                          24
     context                            1
 
   edges by kind
@@ -21,9 +21,7 @@ terraform-aws-vpc
     terraform_reference                19
 
   components drawn more than once
-    disabled                           12
-    vpc                                11
-    wrapper                            3
+    (none)
 
   diagnostics
     info terraform_external_module     4

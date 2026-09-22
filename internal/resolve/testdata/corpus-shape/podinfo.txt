@@ -1,18 +1,18 @@
 podinfo
   files       364 scanned, 59 parsed
-  nodes       27
+  nodes       26
   edges       23
-  connected   5 of 22 components
-  clusters    7
-  redundant   7 of 27 nodes
+  connected   5 of 21 components
+  clusters    6
+  redundant   6 of 26 nodes
 
   nodes by kind
     boundary                           5
     datastore                          1
-    service                            21
+    service                            20
 
   nodes by layer
-    container                          22
+    container                          21
     context                            5
 
   edges by kind
@@ -29,7 +29,7 @@ podinfo
     backend                            3
     frontend                           3
     otel                               2
-    podinfo                            3
+    podinfo                            2
 
   diagnostics
     info helm_values_inferred          2

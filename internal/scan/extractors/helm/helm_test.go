@@ -282,8 +282,11 @@ func TestUmbrellaChartYieldsAComponentPerWorkload(t *testing.T) {
 		t.Fatalf("components = %v, want %v", got, want)
 	}
 	for _, n := range c.nodes {
-		if n.Namespace != "shop" {
-			t.Errorf("%s is in namespace %q, want the chart directory", n.Name, n.Namespace)
+		// The chart name identifies the boundary, not the workloads inside
+		// it: a chart is packaging, and a workload it deploys is the same
+		// component whether a chart or a manifest described it.
+		if n.Namespace != "" {
+			t.Errorf("%s is in namespace %q; a chart is not a deployment scope", n.Name, n.Namespace)
 		}
 		if n.Confidence != schema.ConfWeak {
 			t.Errorf("%s has confidence %.2f; a component read from defaults is not a declared one",

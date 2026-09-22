@@ -87,10 +87,9 @@ func (e *Extractor) Extract(_ context.Context, f *scan.File, emit scan.Emitter) 
 	}
 
 	m := &module{
-		file:      f,
-		namespace: moduleNamespace(f.Dir),
-		scope:     newScope(body),
-		declared:  map[string]string{},
+		file:     f,
+		scope:    newScope(body),
+		declared: map[string]string{},
 	}
 
 	// Two passes. The first records every resource this file declares, so
@@ -105,29 +104,19 @@ func (e *Extractor) Extract(_ context.Context, f *scan.File, emit scan.Emitter) 
 
 // module is one .tf file's worth of context.
 type module struct {
-	file      *scan.File
-	namespace string
-	scope     *scope
+	file  *scan.File
+	scope *scope
 	// declared maps a Terraform address ("aws_sqs_queue.jobs") to the node ID
 	// it became, for resources declared in this file.
 	declared map[string]string
 }
 
-// moduleNamespace names the directory a file belongs to. Terraform treats a
-// directory as one module, so the directory is the natural scope for names.
 // dirPath is the directory a file lives in, as a path a reader can act on.
 func (m *module) dirPath() string {
 	if m.file.Dir == "" {
 		return "."
 	}
 	return m.file.Dir
-}
-
-func moduleNamespace(dir string) string {
-	if dir == "" || dir == "." {
-		return "root"
-	}
-	return dir
 }
 
 func (m *module) collectDeclarations(body *hclsyntax.Body) {
@@ -154,7 +143,11 @@ func (m *module) collectDeclarations(body *hclsyntax.Body) {
 }
 
 func (m *module) nodeID(kind schema.NodeKind, resourceType, name string) string {
-	return schema.NewNodeID(kind, m.namespace, resourceType+"."+name)
+	// A Terraform address is already qualified by its type, and the directory
+	// it was declared in is a module root -- how the configuration is
+	// packaged, not where it is deployed. Keeping it in the scope segment
+	// gave one module described from two roots two identifiers.
+	return schema.NewNodeID(kind, "", resourceType+"."+name)
 }
 
 func (m *module) emitAll(body *hclsyntax.Body, emit scan.Emitter) {
@@ -235,11 +228,11 @@ func (m *module) emitResource(block *hclsyntax.Block, emit scan.Emitter, managed
 		confidence = schema.ConfReference
 	}
 	emit.Node(schema.Node{
-		ID:         id,
-		Kind:       class.kind,
-		Layer:      class.layer,
-		Name:       displayName(attrs, name),
-		Namespace:  m.namespace,
+		ID:    id,
+		Kind:  class.kind,
+		Layer: class.layer,
+		Name:  displayName(attrs, name),
+
 		Tech:       &schema.Tech{Runtime: provider(resourceType), Framework: class.tech},
 		Attrs:      attrs,
 		Sources:    []schema.Source{src},
@@ -253,7 +246,7 @@ func (m *module) emitResource(block *hclsyntax.Block, emit scan.Emitter, managed
 		aliasNames = append(aliasNames, literal)
 	}
 	emit.Alias(resolve.Alias{
-		Name: name, Namespace: m.namespace, DNS: aliasNames, TargetName: address,
+		Name: name, DNS: aliasNames, TargetName: address,
 		Source: schema.Evidence{
 			Extractor: Name, Path: m.file.Path, Line: line,
 			Rule:   "terraform_resource_address",
@@ -315,7 +308,7 @@ func (m *module) emitModule(block *hclsyntax.Block, emit scan.Emitter) {
 
 	emit.Node(schema.Node{
 		ID: id, Kind: moduleKind, Layer: schema.LayerContainer,
-		Name: name, Namespace: m.namespace,
+		Name:  name,
 		Tech:  &schema.Tech{Runtime: "terraform", Framework: "module"},
 		Attrs: attrs, Sources: []schema.Source{{Extractor: Name, Path: m.file.Path, Line: line}},
 		Confidence: schema.ConfDeclared,

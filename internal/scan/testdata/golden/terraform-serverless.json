@@ -1,17 +1,16 @@
 {
   "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:c593f40428ce5ad929a199411d76f99cbbea742b2d0fead19a6abbf96a8332fb",
+  "contentHash": "sha256:33a91c0a7751570b3cd004b0dd87010fb6cdcd4d2b20c4c407394340577510bc",
   "root": {
     "name": "terraform-serverless"
   },
   "nodes": [
     {
-      "id": "container:@root/aws_cognito_user_pool.users",
+      "id": "container:aws_cognito_user_pool.users",
       "kind": "service",
       "layer": "container",
       "name": "orders-us-east-1-users",
-      "namespace": "root",
       "tech": {
         "runtime": "aws",
         "framework": "cognito"
@@ -32,11 +31,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@root/aws_db_instance.orders",
+      "id": "container:aws_db_instance.orders",
       "kind": "datastore",
       "layer": "container",
       "name": "orders-primary",
-      "namespace": "root",
       "tech": {
         "runtime": "aws",
         "framework": "rds"
@@ -61,11 +59,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@root/aws_dynamodb_table.sessions",
+      "id": "container:aws_dynamodb_table.sessions",
       "kind": "datastore",
       "layer": "container",
       "name": "sessions",
-      "namespace": "root",
       "tech": {
         "runtime": "aws",
         "framework": "dynamodb"
@@ -87,11 +84,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@root/aws_elasticache_replication_group.cache",
+      "id": "container:aws_elasticache_replication_group.cache",
       "kind": "datastore",
       "layer": "container",
       "name": "cache",
-      "namespace": "root",
       "tech": {
         "runtime": "aws",
         "framework": "elasticache"
@@ -111,11 +107,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@root/aws_lambda_function.api",
+      "id": "container:aws_lambda_function.api",
       "kind": "service",
       "layer": "container",
       "name": "orders-us-east-1-api",
-      "namespace": "root",
       "tech": {
         "runtime": "aws",
         "framework": "lambda"
@@ -138,11 +133,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@root/aws_lambda_function.worker",
+      "id": "container:aws_lambda_function.worker",
       "kind": "service",
       "layer": "container",
       "name": "orders-us-east-1-worker",
-      "namespace": "root",
       "tech": {
         "runtime": "aws",
         "framework": "lambda"
@@ -165,11 +159,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@root/aws_s3_bucket.shared_assets",
+      "id": "container:aws_s3_bucket.shared_assets",
       "kind": "datastore",
       "layer": "container",
       "name": "acme-shared-assets",
-      "namespace": "root",
       "tech": {
         "runtime": "aws",
         "framework": "s3"
@@ -191,11 +184,10 @@
       "confidence": 0.95
     },
     {
-      "id": "container:@root/aws_s3_bucket.uploads",
+      "id": "container:aws_s3_bucket.uploads",
       "kind": "datastore",
       "layer": "container",
       "name": "orders-us-east-1-uploads",
-      "namespace": "root",
       "tech": {
         "runtime": "aws",
         "framework": "s3"
@@ -216,11 +208,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@root/aws_sqs_queue.jobs",
+      "id": "container:aws_sqs_queue.jobs",
       "kind": "queue",
       "layer": "container",
       "name": "orders-us-east-1-jobs",
-      "namespace": "root",
       "tech": {
         "runtime": "aws",
         "framework": "sqs"
@@ -241,11 +232,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@root/aws_sqs_queue.jobs_dlq",
+      "id": "container:aws_sqs_queue.jobs_dlq",
       "kind": "queue",
       "layer": "container",
       "name": "orders-us-east-1-jobs-dlq",
-      "namespace": "root",
       "tech": {
         "runtime": "aws",
         "framework": "sqs"
@@ -266,11 +256,10 @@
       "confidence": 1
     },
     {
-      "id": "container:@root/module.network",
+      "id": "container:module.network",
       "kind": "cloud_resource",
       "layer": "container",
       "name": "network",
-      "namespace": "root",
       "tech": {
         "runtime": "terraform",
         "framework": "module"
@@ -292,9 +281,9 @@
   ],
   "edges": [
     {
-      "id": "e:e7ce0279132c",
-      "from": "container:@root/aws_lambda_function.api",
-      "to": "container:@root/aws_db_instance.orders",
+      "id": "e:0ed454324d93",
+      "from": "container:aws_lambda_function.api",
+      "to": "container:aws_db_instance.orders",
       "kind": "persists_to",
       "confidence": 0.95,
       "evidence": [
@@ -308,9 +297,9 @@
       ]
     },
     {
-      "id": "e:c214c2fea24f",
-      "from": "container:@root/aws_lambda_function.api",
-      "to": "container:@root/aws_dynamodb_table.sessions",
+      "id": "e:5f9078d4b04e",
+      "from": "container:aws_lambda_function.api",
+      "to": "container:aws_dynamodb_table.sessions",
       "kind": "persists_to",
       "confidence": 0.95,
       "evidence": [
@@ -324,9 +313,9 @@
       ]
     },
     {
-      "id": "e:06c71345e8d6",
-      "from": "container:@root/aws_lambda_function.api",
-      "to": "container:@root/aws_s3_bucket.uploads",
+      "id": "e:87d1bc7c470a",
+      "from": "container:aws_lambda_function.api",
+      "to": "container:aws_s3_bucket.uploads",
       "kind": "persists_to",
       "confidence": 0.95,
       "evidence": [
@@ -340,9 +329,9 @@
       ]
     },
     {
-      "id": "e:1b155ab85bca",
-      "from": "container:@root/aws_lambda_function.api",
-      "to": "container:@root/aws_sqs_queue.jobs",
+      "id": "e:f5e858d7b9b9",
+      "from": "container:aws_lambda_function.api",
+      "to": "container:aws_sqs_queue.jobs",
       "kind": "publishes_to",
       "confidence": 0.95,
       "evidence": [
@@ -356,9 +345,9 @@
       ]
     },
     {
-      "id": "e:e0d83f051a10",
-      "from": "container:@root/aws_lambda_function.worker",
-      "to": "container:@root/aws_sqs_queue.jobs",
+      "id": "e:c55da929b21e",
+      "from": "container:aws_lambda_function.worker",
+      "to": "container:aws_sqs_queue.jobs",
       "kind": "publishes_to",
       "confidence": 0.95,
       "evidence": [
@@ -372,9 +361,9 @@
       ]
     },
     {
-      "id": "e:8d3244f73a8e",
-      "from": "container:@root/aws_lambda_function.worker",
-      "to": "container:@root/aws_sqs_queue.jobs_dlq",
+      "id": "e:ee199c799065",
+      "from": "container:aws_lambda_function.worker",
+      "to": "container:aws_sqs_queue.jobs_dlq",
       "kind": "publishes_to",
       "confidence": 0.95,
       "evidence": [
