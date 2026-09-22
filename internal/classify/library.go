@@ -79,21 +79,36 @@ var vendorTech = map[string]bool{
 	"aws": true, "gcp": true, "azure": true,
 }
 
-// libraries maps a dependency name to the infrastructure it implies. Keys are
-// matched as prefixes, so a module path covers its subpackages.
+// libraries maps a dependency name to the infrastructure it implies.
+//
+// A key is matched exactly, and two kinds of key also match as a prefix: one
+// containing "/", so that a module path covers its subpackages, and one
+// ending in "-" or "/", which marks a package family whose members all name
+// the same system. The trailing separator is the opt-in. Without it, short
+// keys like "pg" would prefix-match "pgp" and the table would start guessing,
+// which is the one thing a lookup table exists not to do.
 var libraries = map[string]Library{
 	// Postgres
 	"github.com/lib/pq":    {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
 	"github.com/jackc/pgx": {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
 	"psycopg2":             {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
 	"psycopg":              {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
-	"asyncpg":              {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
-	"pg":                   {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
-	"postgres":             {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
+	// psycopg ships its binary build and its pool as separate distributions,
+	// and psycopg2-binary is how most requirements.txt files name psycopg2 at
+	// all. Matching only the bare name missed the common case.
+	"psycopg-":  {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
+	"psycopg2-": {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
+	"pgvector":  {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
+	"asyncpg":   {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
+	"pg":        {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
+	"postgres":  {"postgres", schema.KindDatastore, schema.EdgePersistsTo},
 
 	// MySQL
 	"github.com/go-sql-driver/mysql": {"mysql", schema.KindDatastore, schema.EdgePersistsTo},
 	"mysqlclient":                    {"mysql", schema.KindDatastore, schema.EdgePersistsTo},
+	"mysql":                          {"mysql", schema.KindDatastore, schema.EdgePersistsTo},
+	"mysql-connector":                {"mysql", schema.KindDatastore, schema.EdgePersistsTo},
+	"mysql-connector-python":         {"mysql", schema.KindDatastore, schema.EdgePersistsTo},
 	"pymysql":                        {"mysql", schema.KindDatastore, schema.EdgePersistsTo},
 	"mysql2":                         {"mysql", schema.KindDatastore, schema.EdgePersistsTo},
 
@@ -140,14 +155,19 @@ var libraries = map[string]Library{
 
 	// Cloud SDKs. These name a provider rather than one service, so the
 	// resolver treats the result as an external boundary.
-	"github.com/aws/aws-sdk-go":         {"aws", schema.KindExternal, schema.EdgeCalls},
-	"boto3":                             {"aws", schema.KindExternal, schema.EdgeCalls},
-	"aws-sdk":                           {"aws", schema.KindExternal, schema.EdgeCalls},
-	"@aws-sdk/client-s3":                {"s3", schema.KindDatastore, schema.EdgePersistsTo},
-	"@aws-sdk/client-sqs":               {"sqs", schema.KindQueue, schema.EdgePublishesTo},
-	"@aws-sdk/client-dynamodb":          {"dynamodb", schema.KindDatastore, schema.EdgePersistsTo},
-	"cloud.google.com/go":               {"gcp", schema.KindExternal, schema.EdgeCalls},
-	"google-cloud-storage":              {"gcs", schema.KindDatastore, schema.EdgePersistsTo},
+	"github.com/aws/aws-sdk-go": {"aws", schema.KindExternal, schema.EdgeCalls},
+	"boto3":                     {"aws", schema.KindExternal, schema.EdgeCalls},
+	"aws-sdk":                   {"aws", schema.KindExternal, schema.EdgeCalls},
+	"@aws-sdk/client-s3":        {"s3", schema.KindDatastore, schema.EdgePersistsTo},
+	"@aws-sdk/client-sqs":       {"sqs", schema.KindQueue, schema.EdgePublishesTo},
+	"@aws-sdk/client-dynamodb":  {"dynamodb", schema.KindDatastore, schema.EdgePersistsTo},
+	"cloud.google.com/go":       {"gcp", schema.KindExternal, schema.EdgeCalls},
+	"google-cloud-storage":      {"gcs", schema.KindDatastore, schema.EdgePersistsTo},
+	// The Go SDK was recognized and the other two ecosystems were not, so a
+	// Python or Node service on the same platform as a Go one drew no edge.
+	// google-cloud-storage stays a bucket: an exact key beats a family.
+	"google-cloud-":                     {"gcp", schema.KindExternal, schema.EdgeCalls},
+	"@google-cloud/":                    {"gcp", schema.KindExternal, schema.EdgeCalls},
 	"github.com/Azure/azure-sdk-for-go": {"azure", schema.KindExternal, schema.EdgeCalls},
 	"azure-storage-blob":                {"azure", schema.KindExternal, schema.EdgeCalls},
 
@@ -293,7 +313,7 @@ func LibraryImplies(dependency string) (lib Library, ok bool) {
 	// longest registered prefix so that a submodule resolves like its parent.
 	best, bestLen := Library{}, 0
 	for prefix, lib := range libraries {
-		if !strings.Contains(prefix, "/") {
+		if !strings.Contains(prefix, "/") && !strings.HasSuffix(prefix, "-") {
 			continue
 		}
 		if strings.HasPrefix(name, prefix) && len(prefix) > bestLen {

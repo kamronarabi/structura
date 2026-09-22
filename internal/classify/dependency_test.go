@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/kamronarabi/structura/internal/classify"
+	"github.com/kamronarabi/structura/pkg/schema"
 )
 
 // Every ecosystem decorates a dependency name differently, and the graph is
@@ -99,5 +100,67 @@ func TestOnlyADigitSuffixIsAMajorVersion(t *testing.T) {
 	// The control: with digits, it is a version and the parent resolves.
 	if lib, ok := classify.LibraryImplies("github.com/lib/pq/v10"); !ok || lib.Tech != "postgres" {
 		t.Errorf("LibraryImplies(.../v10) = (%q, %v), want (postgres, true)", lib.Tech, ok)
+	}
+}
+
+// A key ending in "-" or "/" marks a package family: every member names the
+// same system, and spelling them all out would be a list nobody maintains.
+func TestPackageFamiliesResolveToOneSystem(t *testing.T) {
+	tests := []struct {
+		dep  string
+		tech string
+	}{
+		// The same SDK family in three ecosystems. Before these, whether a
+		// service drew a GCP edge depended on the language it was written in.
+		{"google-cloud-secret-manager", "gcp"},
+		{"google-cloud-trace", "gcp"},
+		{"google-cloud-alloydb-connector[asyncpg]", "gcp"},
+		{"@google-cloud/profiler", "gcp"},
+		{"@google-cloud/trace-agent", "gcp"},
+		{"cloud.google.com/go/profiler", "gcp"},
+
+		// psycopg distributes its binary build and its pool separately.
+		{"psycopg-binary", "postgres"},
+		{"psycopg-pool", "postgres"},
+		{"psycopg2-binary", "postgres"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.dep, func(t *testing.T) {
+			lib, ok := classify.LibraryImplies(tt.dep)
+			if !ok || lib.Tech != tt.tech {
+				t.Errorf("LibraryImplies(%q) = (%q, %v), want (%q, true)", tt.dep, lib.Tech, ok, tt.tech)
+			}
+		})
+	}
+}
+
+// A more specific key wins, so naming one member of a family does not get
+// flattened into the family's answer.
+func TestAnExactKeyBeatsItsFamily(t *testing.T) {
+	// A bucket is a datastore you persist to. The provider is an external
+	// system you call. Collapsing the first into the second would lose the
+	// only storage relationship the dependency states.
+	lib, ok := classify.LibraryImplies("google-cloud-storage")
+	if !ok || lib.Tech != "gcs" || lib.Kind != schema.KindDatastore {
+		t.Fatalf("LibraryImplies(google-cloud-storage) = (%q, %s, %v), want (gcs, datastore, true)",
+			lib.Tech, lib.Kind, ok)
+	}
+}
+
+// The trailing separator is the opt-in, and it is the only thing standing
+// between a lookup table and a guessing one. "pg" and "redis" are keys; if
+// bare keys prefix-matched, a PGP library and a Redis-inspired search engine
+// would both be reported as infrastructure this service talks to.
+func TestBareKeysDoNotPrefixMatch(t *testing.T) {
+	for _, dep := range []string{
+		"pgp",
+		"pgpy",
+		"redisearch-fake",
+		"mysqlish",
+		"postgrest-py",
+	} {
+		if lib, ok := classify.LibraryImplies(dep); ok {
+			t.Errorf("LibraryImplies(%q) = (%q, true); a bare key prefix-matched", dep, lib.Tech)
+		}
 	}
 }

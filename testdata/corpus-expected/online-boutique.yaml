@@ -49,10 +49,24 @@ allowed:
   # `* -> gcp` keeps the gate informative: a fifth service acquiring a cloud
   # dependency is a change to the architecture, and it should surface here and
   # be read by someone rather than be absorbed by a wildcard.
+  #
+  # The Python and Node services joined the list when the dependency table
+  # learned their ecosystems' spelling for the same SDK family: currencyservice
+  # and paymentservice declare @google-cloud/profiler, emailservice declares
+  # google-cloud-trace, and shoppingassistantservice reaches AlloyDB and Secret
+  # Manager. Before that, whether a service drew this edge depended on the
+  # language it happened to be written in rather than on what it talks to.
+  #
+  # They arrived here by failing the gate, which is the argument against
+  # writing this as `* -> gcp`.
   - {from: checkoutservice, to: gcp}
+  - {from: currencyservice, to: gcp}
+  - {from: emailservice, to: gcp}
   - {from: frontend, to: gcp}
+  - {from: paymentservice, to: gcp}
   - {from: productcatalogservice, to: gcp}
   - {from: shippingservice, to: gcp}
+  - {from: shoppingassistantservice, to: gcp}
 
   # Tracing. Every instrumented service reads COLLECTOR_SERVICE_ADDR, which is
   # what the source oracle found, and these sat under `edges` for a while on
