@@ -214,7 +214,16 @@ func normalizeEvidence(in []Evidence) []Evidence {
 		if in[i].Line != in[j].Line {
 			return in[i].Line < in[j].Line
 		}
-		return in[i].Detail < in[j].Detail
+		if in[i].Detail != in[j].Detail {
+			return in[i].Detail < in[j].Detail
+		}
+		// Extractor is compared last, and it has to be compared. The dedup
+		// below treats two entries differing only here as distinct, so
+		// leaving them equal to the sort kept both in whatever order the
+		// concurrent pipeline happened to add them -- which changed
+		// graph.json, and with it the content hash, between runs of the same
+		// scan.
+		return in[i].Extractor < in[j].Extractor
 	})
 	out := in[:0]
 	var prev Evidence

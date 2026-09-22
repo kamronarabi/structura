@@ -319,6 +319,27 @@ func validateRelPath(p string) error {
 // The name segment is copied verbatim rather than rebuilt, because rebuilding
 // would fold an already-folded name a second time and could append a second
 // discriminator to a name that already carries one.
+//
+// # A collision this does not resolve
+//
+// The prefix and the namespace are joined with a hyphen and folded together,
+// and a hyphen is an ordinary character in both. So ("web-api", "prod") and
+// ("web", "api-prod") produce the same segment, and two projects merge into
+// the one boundary this exists to keep apart. TestQualifyNamespaceCollision
+// holds the case.
+//
+// It is not fixable here. A separator that folding cannot produce would have
+// to survive ValidateNodeID, which requires an ID to be unchanged by
+// re-normalization -- and folding collapses a run of hyphens, so "--" does
+// not survive. Underscore does survive, and therefore can appear in a project
+// name, so it collides in the same way. What is left is a discriminator on
+// every qualified namespace, which would churn the IDs of every multi-project
+// repository to fix a case most of them do not have.
+//
+// The caller can fix it and this function cannot: qualifyByProject sees every
+// project at once, so it can detect two pairs folding to one segment and
+// disambiguate only those. Recorded here because the decision belongs with
+// whoever owns that pass.
 func QualifyNamespace(id, prefix string) (string, error) {
 	if prefix == "" {
 		return id, nil

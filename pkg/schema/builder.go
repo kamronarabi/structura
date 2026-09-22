@@ -58,6 +58,17 @@ func (b *Builder) AddNode(n Node) {
 		})
 	}
 
+	// Strictly greater, so an equally confident reading does not displace
+	// the one already here: the first contribution wins every field below.
+	//
+	// That makes the merged node depend on the order AddNode is called in,
+	// which is only safe because the caller fixes that order. The pipeline
+	// merges per-file outputs in the walker's sorted path order rather than
+	// in the order its workers finished, so "first" means "from the file
+	// whose path sorts first" and not "whichever goroutine won the race".
+	// A caller that folds contributions in a different order will get a
+	// different node, and a caller that folds them in no fixed order will
+	// get a different graph on every run.
 	incomingWins := n.Confidence > existing.Confidence
 	if incomingWins {
 		existing.Confidence = n.Confidence
@@ -97,18 +108,6 @@ func (b *Builder) AddEdge(e Edge) {
 // Diag records a diagnostic.
 func (b *Builder) Diag(d Diagnostic) { b.diags = append(b.diags, d) }
 
-// Has reports whether a node with the given ID has been added.
-func (b *Builder) Has(id string) bool { _, ok := b.nodes[id]; return ok }
-
-// Node returns a copy of an accumulated node.
-func (b *Builder) Node(id string) (Node, bool) {
-	n, ok := b.nodes[id]
-	if !ok {
-		return Node{}, false
-	}
-	return *n, true
-}
-
 // NodeIDs returns every accumulated node ID in sorted order.
 func (b *Builder) NodeIDs() []string {
 	ids := make([]string, 0, len(b.nodes))
@@ -117,11 +116,6 @@ func (b *Builder) NodeIDs() []string {
 	}
 	sort.Strings(ids)
 	return ids
-}
-
-// Counts reports how much has accumulated so far.
-func (b *Builder) Counts() (nodes, edges, diagnostics int) {
-	return len(b.nodes), len(b.edges), len(b.diags)
 }
 
 // Nodes returns the merged node set and any diagnostics merging produced,
