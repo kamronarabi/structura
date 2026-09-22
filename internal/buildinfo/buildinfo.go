@@ -49,6 +49,12 @@ func Set(v, c, d string) {
 }
 
 func fillFromVCS() {
+	// A linker that supplied both a commit and a date has said everything
+	// the VCS stamp could. Note what this also means: dirty is not consulted
+	// for such a build. That is correct for a release, which is built from a
+	// clean checkout, and the Makefile's development build compensates by
+	// stamping "-dirty" into the version string itself. A third caller
+	// supplying commit and date from somewhere else would not get the marker.
 	if commit != "" && date != "" {
 		return
 	}
@@ -56,7 +62,18 @@ func fillFromVCS() {
 	if !ok {
 		return
 	}
-	for _, s := range info.Settings {
+	applyVCS(info.Settings)
+}
+
+// applyVCS interprets the VCS stamp Go embeds in a binary built from a
+// checkout.
+//
+// It is separate from the lookup above so that the interpretation can be
+// tested. A test binary carries no vcs.* settings at all, so driving this
+// through debug.ReadBuildInfo would execute the loop against nothing and
+// assert that nothing happened.
+func applyVCS(settings []debug.BuildSetting) {
+	for _, s := range settings {
 		switch s.Key {
 		case "vcs.revision":
 			if commit == "" {
