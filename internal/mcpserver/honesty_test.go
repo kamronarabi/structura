@@ -70,13 +70,13 @@ func TestEmptyDiagnosticsDoNotClaimCompleteness(t *testing.T) {
 func TestUnreadInfrastructureFileSurfacesInDiagnostics(t *testing.T) {
 	root := repoWith(t, map[string]string{
 		"package.json": `{"name":"app"}`,
-		"Dockerfile":   "FROM node:22-alpine\nEXPOSE 3000\n",
+		"vercel.json":  `{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}`,
 		"fly.toml":     "app = \"demo\"\n",
 	})
 	s, ctx := connect(t, root)
 
 	out, _ := callText(t, s, ctx, "structura_diagnostics", map[string]any{})
-	for _, want := range []string{"Dockerfile", "Fly.io"} {
+	for _, want := range []string{"Vercel", "Fly.io"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("diagnostics do not mention the unread %s:\n%s", want, out)
 		}

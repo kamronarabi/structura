@@ -15,9 +15,9 @@ import (
 // all about what it never opened, so a repository whose architecture lives in
 // a format no extractor handles produced a thin graph, an empty gap list, and
 // a reader with no way to tell the difference between "there is nothing here"
-// and "I cannot read this". On a React application with a Dockerfile, four of
-// five files went unexamined and the tool answered "everything this scan
-// recognized, it parsed".
+// and "I cannot read this". On a React application deployed to a managed
+// platform, four of five files went unexamined and the tool answered
+// "everything this scan recognized, it parsed".
 //
 // Listing every unread file would be worse than silence: most files in any
 // repository are source code, and saying so on every scan trains a reader to
@@ -28,7 +28,8 @@ import (
 // rather than the repository's.
 //
 // Each entry disappears on its own the day an extractor claims the file,
-// because only files that matched nothing are considered.
+// because only files that matched nothing are considered. The Dockerfile entry
+// that prompted this file is already gone that way.
 
 // unsupportedFormat is a file type that describes architecture and that no
 // extractor reads.
@@ -52,16 +53,6 @@ type unsupportedFormat struct {
 // that is commonly something else. A "template.yaml" might be CloudFormation
 // or might be anything, so it is not here.
 var unsupportedFormats = []unsupportedFormat{
-	{
-		singular: "Dockerfile", plural: "Dockerfiles",
-		missingOne:  "the base image it builds on, the ports it exposes, and its build stages",
-		missingMany: "the base images they build on, the ports they expose, and their build stages",
-		match: func(f FileMeta) bool {
-			name := strings.ToLower(f.Name)
-			return name == "dockerfile" || name == "containerfile" ||
-				strings.HasPrefix(name, "dockerfile.") || f.Ext == ".dockerfile"
-		},
-	},
 	{
 		singular: "Vercel configuration", plural: "Vercel configurations",
 		missingOne:  "the routes, rewrites, and functions it deploys",

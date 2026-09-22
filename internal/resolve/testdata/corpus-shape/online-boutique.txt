@@ -1,19 +1,19 @@
 online-boutique
-  files       363 scanned, 77 parsed
-  nodes       37
+  files       363 scanned, 90 parsed
+  nodes       38
   edges       39
-  connected   17 of 33 components
-  clusters    19
+  connected   17 of 34 components
+  clusters    20
 
   nodes by kind
     boundary                           4
     cloud_resource                     4
     datastore                          2
     external                           1
-    service                            26
+    service                            27
 
   nodes by layer
-    container                          32
+    container                          33
     context                            5
 
   edges by kind
@@ -30,12 +30,11 @@ online-boutique
     terraform_reference                2
 
   diagnostics
-    info code_joined_to_deployment     10
+    info code_joined_to_deployment     11
     info helm_values_inferred          1
     info k8s_patch_fragment            1
     info kustomize_unrendered          21
     info terraform_external_module     3
     info terraform_unrecognized_resource 1
     info unresolved_reference          1
-    info unsupported_format            1
     warn helm_unrendered               1

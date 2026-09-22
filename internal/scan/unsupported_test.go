@@ -52,15 +52,15 @@ func diagnosticsWithCode(g schema.Graph, code string) []schema.Diagnostic {
 func TestUnreadArchitecturalFileIsReported(t *testing.T) {
 	g := scanRoot(t, writeFiles(t, map[string]string{
 		"package.json": `{"name":"app","dependencies":{"react":"^18.0.0"}}`,
-		"Dockerfile":   "FROM node:22-alpine\nEXPOSE 3000\n",
+		"vercel.json":  `{"rewrites":[{"source":"/api/(.*)","destination":"/api"}]}`,
 	}))
 
 	got := diagnosticsWithCode(g, "unsupported_format")
 	if len(got) != 1 {
 		t.Fatalf("unsupported_format diagnostics = %d, want 1: %+v", len(got), g.Diagnostics)
 	}
-	if got[0].Path != "Dockerfile" {
-		t.Errorf("Path = %q, want Dockerfile", got[0].Path)
+	if got[0].Path != "vercel.json" {
+		t.Errorf("Path = %q, want vercel.json", got[0].Path)
 	}
 	if got[0].Severity != schema.SeverityInfo {
 		t.Errorf("Severity = %q, want info", got[0].Severity)
@@ -74,11 +74,11 @@ func TestUnreadArchitecturalFileIsReported(t *testing.T) {
 }
 
 // One entry per format, not one per file, or a monorepo of forty services
-// buries every other diagnostic under forty Dockerfiles.
+// buries every other diagnostic under forty copies of one gap.
 func TestManyFilesOfOneFormatAreOneDiagnostic(t *testing.T) {
 	files := map[string]string{"package.json": `{"name":"app"}`}
 	for _, svc := range []string{"a", "b", "c"} {
-		files["services/"+svc+"/Dockerfile"] = "FROM scratch\n"
+		files["services/"+svc+"/Procfile"] = "web: ./" + svc + "\n"
 	}
 	g := scanRoot(t, writeFiles(t, files))
 
@@ -87,12 +87,12 @@ func TestManyFilesOfOneFormatAreOneDiagnostic(t *testing.T) {
 		t.Fatalf("diagnostics = %d, want 1: %+v", len(got), got)
 	}
 	msg := got[0].Message
-	if !strings.Contains(msg, "3 Dockerfiles") {
+	if !strings.Contains(msg, "3 Procfiles") {
 		t.Errorf("message does not count the files: %s", msg)
 	}
 	for _, svc := range []string{"a", "b", "c"} {
-		if !strings.Contains(msg, "services/"+svc+"/Dockerfile") {
-			t.Errorf("message does not name services/%s/Dockerfile: %s", svc, msg)
+		if !strings.Contains(msg, "services/"+svc+"/Procfile") {
+			t.Errorf("message does not name services/%s/Procfile: %s", svc, msg)
 		}
 	}
 	// Naming one of several in Path would send a reader to an arbitrary
@@ -106,7 +106,7 @@ func TestManyFilesOfOneFormatAreOneDiagnostic(t *testing.T) {
 func TestDistinctFormatsAreReportedSeparately(t *testing.T) {
 	g := scanRoot(t, writeFiles(t, map[string]string{
 		"package.json": `{"name":"app"}`,
-		"Dockerfile":   "FROM scratch\n",
+		"vercel.json":  `{"functions":{"api/*.ts":{"memory":1024}}}`,
 		"fly.toml":     "app = \"demo\"\n",
 		"Procfile":     "web: node server.js\n",
 	}))
@@ -119,7 +119,7 @@ func TestDistinctFormatsAreReportedSeparately(t *testing.T) {
 	for _, d := range got {
 		joined += d.Message + "\n"
 	}
-	for _, want := range []string{"Dockerfile", "Fly.io", "Procfile"} {
+	for _, want := range []string{"Vercel", "Fly.io", "Procfile"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("no diagnostic mentions %s:\n%s", want, joined)
 		}
@@ -149,6 +149,10 @@ func TestFilesAnExtractorReadsAreNotReported(t *testing.T) {
 	g := scanRoot(t, writeFiles(t, map[string]string{
 		"docker-compose.yml": "services:\n  web:\n    image: nginx:1.27\n",
 		"package.json":       `{"name":"app"}`,
+		// The entry that prompted this file, retired when the extractor
+		// arrived. A repository whose Dockerfile is read must not also be
+		// told its Dockerfile went unread.
+		"Dockerfile": "FROM node:22-alpine\nEXPOSE 3000\n",
 	}))
 
 	if got := diagnosticsWithCode(g, "unsupported_format"); len(got) != 0 {

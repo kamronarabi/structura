@@ -342,7 +342,7 @@ func attrSummary(attrs schema.Attrs, limit int) string {
 		return ""
 	}
 	priority := []string{
-		"image", "ports", "replicas", "resourceType", "workload", "engine",
+		"image", "baseImage", "ports", "replicas", "resourceType", "workload", "engine",
 		"language", "module", "package", "schedule", "hosts", "multiplicity",
 		"managed", "external", "usesTechnology",
 	}

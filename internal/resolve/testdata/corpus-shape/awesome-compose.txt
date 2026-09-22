@@ -1,5 +1,5 @@
 awesome-compose
-  files       493 scanned, 60 parsed
+  files       493 scanned, 95 parsed
   nodes       119
   edges       114
   connected   56 of 81 components
@@ -31,5 +31,4 @@ awesome-compose
   diagnostics
     info env_placeholder_reference     1
     info unresolved_reference          1
-    info unsupported_format            1
     warn compose_parse_failed          1

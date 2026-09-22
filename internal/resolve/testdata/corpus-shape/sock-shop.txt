@@ -1,19 +1,19 @@
 sock-shop
-  files       197 scanned, 100 parsed
-  nodes       71
+  files       197 scanned, 104 parsed
+  nodes       74
   edges       79
-  connected   30 of 63 components
-  clusters    15
+  connected   30 of 66 components
+  clusters    18
 
   nodes by kind
     boundary                           8
     cloud_resource                     3
     datastore                          7
     queue                              2
-    service                            51
+    service                            54
 
   nodes by layer
-    container                          63
+    container                          66
     context                            8
 
   edges by kind
@@ -36,6 +36,5 @@ sock-shop
     info terraform_unrecognized_resource 1
     info unmatched_service_selector    8
     info unresolved_reference          13
-    info unsupported_format            1
     warn helm_unrendered               1
     warn undeclared_projects           1

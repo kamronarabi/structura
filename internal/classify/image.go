@@ -159,29 +159,40 @@ func ImageKind(ref string) (kind schema.NodeKind, tech string, recognized bool) 
 	if img.Name == "" {
 		return schema.KindService, "", false
 	}
-	if known, ok := knownImages[strings.ToLower(img.Name)]; ok {
-		return known.kind, known.tech, true
+	for _, name := range imageNameVariants(img.Name) {
+		if known, ok := knownImages[name]; ok {
+			return known.kind, known.tech, true
+		}
 	}
-	// Publishers decorate the product name in predictable ways: Bitnami and
-	// Confluent prefix it, and many images append a base-image variant.
-	// Stripping those is what lets confluentinc/cp-kafka and
-	// bitnami/postgresql resolve to the same products as kafka and postgres.
-	base := strings.ToLower(img.Name)
-	for _, prefix := range []string{"cp-", "docker-", "library-", "os-"} {
+	return schema.KindService, "", false
+}
+
+// imagePrefixes and imageSuffixes are the decorations publishers add to a
+// product name. Bitnami and Confluent prefix it, and many images append a
+// base-image variant. Stripping them is what lets confluentinc/cp-kafka and
+// bitnami/postgresql resolve to the same products as kafka and postgres.
+var (
+	imagePrefixes = []string{"cp-", "docker-", "library-", "os-"}
+	imageSuffixes = []string{"-alpine", "-slim", "-bookworm", "-bullseye", "-server", "-oss", "-ce"}
+)
+
+// imageNameVariants returns the forms of an image's final path element that a
+// lookup table may be keyed on, most literal first. Callers take the first
+// variant their table knows, so a decorated name never shadows an exact one.
+func imageNameVariants(name string) []string {
+	base := strings.ToLower(name)
+	out := []string{base}
+	for _, prefix := range imagePrefixes {
 		if trimmed, ok := strings.CutPrefix(base, prefix); ok {
-			if known, ok := knownImages[trimmed]; ok {
-				return known.kind, known.tech, true
-			}
+			out = append(out, trimmed)
 			base = trimmed
 			break
 		}
 	}
-	for _, suffix := range []string{"-alpine", "-slim", "-bookworm", "-bullseye", "-server", "-oss", "-ce"} {
+	for _, suffix := range imageSuffixes {
 		if trimmed, ok := strings.CutSuffix(base, suffix); ok {
-			if known, ok := knownImages[trimmed]; ok {
-				return known.kind, known.tech, true
-			}
+			out = append(out, trimmed)
 		}
 	}
-	return schema.KindService, "", false
+	return out
 }

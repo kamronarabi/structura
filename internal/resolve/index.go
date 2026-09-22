@@ -61,14 +61,22 @@ type Identity struct {
 	Project string
 }
 
+// codeExtractors are the extractors whose namespace holds a language rather
+// than a deployment boundary, because a file describing a codebase genuinely
+// does not know what deploys it. A manifest writes the language there; a
+// Dockerfile writes the language its base image runs, or "container" when the
+// base names none.
+//
+// The names are spelled out rather than imported because the extractors depend
+// on this package, not the other way round.
+var codeExtractors = map[string]bool{
+	"manifest":   true,
+	"dockerfile": true,
+}
+
 // scopeFromNamespace reports whether an extractor's namespace names a
 // deployment boundary.
-//
-// Only the manifest extractor does not: it writes the language there, because
-// a dependency manifest genuinely does not know what deploys its code. The
-// name is spelled out rather than imported because the extractors depend on
-// this package, not the other way round.
-func scopeFromNamespace(extractor string) bool { return extractor != "manifest" }
+func scopeFromNamespace(extractor string) bool { return !codeExtractors[extractor] }
 
 // Index maps every known identity form to the nodes that claim it.
 //

@@ -32,13 +32,16 @@ type Result struct {
 // "api-gateway calls user-service" — that has to be recovered by matching
 // names across artifacts, and doing it well is most of the product.
 //
-// The order below matters. Aliases run first because they are what makes a
-// Service name resolvable at all; node merging runs next so that references
-// land on one component rather than two halves of one; directory-owned hints
-// bind after merging, so that a .env file attaches to the component that
-// survived it; ConfigMap indirection runs before matching so that values
-// reached through a mount are available; and matching runs last, over a
-// complete picture.
+// The order below matters. Files in one directory are folded first, because
+// every step after it asks how many components live somewhere and gets the
+// wrong answer while a codebase is still described twice; aliases run next
+// because they are what makes a Service name resolvable at all; the join from
+// a codebase to the container that runs it follows, so that references land on
+// one component rather than two halves of one; directory-owned hints bind
+// after merging, so that a
+// .env file attaches to the component that survived it; ConfigMap indirection
+// runs before matching so that values reached through a mount are available;
+// and matching runs last, over a complete picture.
 func Resolve(in Input) Result {
 	r := &resolver{
 		index:        NewIndex(in.Nodes),
@@ -51,6 +54,9 @@ func Resolve(in Input) Result {
 	for i := range r.nodes {
 		r.byID[r.nodes[i].ID] = &r.nodes[i]
 	}
+
+	r.mergeDirectoryDuplicates()
+	r.reindexSurvivors()
 
 	r.applyAliases(in.Aliases)
 	r.mergeCodeIntoDeployments()
@@ -190,29 +196,7 @@ func (r *resolver) mergeCodeIntoDeployments() {
 		// The deployment survives: it is the thing that runs, and it is what
 		// other infrastructure references. The codebase contributes what
 		// only it knows.
-		if codeNode.Tech != nil {
-			if deploymentNode.Tech == nil {
-				deploymentNode.Tech = &schema.Tech{}
-			}
-			if deploymentNode.Tech.Language == "" {
-				deploymentNode.Tech.Language = codeNode.Tech.Language
-			}
-			if deploymentNode.Tech.Framework == "" {
-				deploymentNode.Tech.Framework = codeNode.Tech.Framework
-			}
-		}
-		for _, key := range []string{"module", "package", "manifest", "directory", "dependencyCount",
-			"goVersion", "nodeVersion", "pythonVersion", "version"} {
-			if v, ok := codeNode.Attrs[key]; ok {
-				if deploymentNode.Attrs == nil {
-					deploymentNode.Attrs = schema.Attrs{}
-				}
-				if _, present := deploymentNode.Attrs[key]; !present {
-					deploymentNode.Attrs[key] = v
-				}
-			}
-		}
-		deploymentNode.Sources = append(deploymentNode.Sources, codeNode.Sources...)
+		contributeInto(deploymentNode, codeNode)
 		r.merges[code] = deployment
 
 		// Inferred joins are reported; a build context is not, because it
@@ -927,6 +911,30 @@ func (r *resolver) applyMerges() {
 		}
 	}
 	r.edges = edges
+}
+
+// reindexSurvivors rebuilds the identity index over the nodes that are still
+// standing.
+//
+// A merge recorded early has to be visible to the steps that follow, and they
+// read the index rather than the node list: leaving an absorbed codebase in it
+// would leave every later question about "how many components are in this
+// directory" answered as it was before the fold, which is the thing the fold
+// exists to correct.
+//
+// Nothing has attached to the index yet at this point -- aliases run after --
+// so rebuilding loses no accumulated knowledge.
+func (r *resolver) reindexSurvivors() {
+	if len(r.merges) == 0 {
+		return
+	}
+	surviving := make([]schema.Node, 0, len(r.nodes))
+	for _, n := range r.nodes {
+		if _, merged := r.merges[n.ID]; !merged {
+			surviving = append(surviving, n)
+		}
+	}
+	r.index = NewIndex(surviving)
 }
 
 // collapseGenericEdges folds a depends_on into a more specific relationship

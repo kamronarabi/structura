@@ -1,5 +1,5 @@
 podinfo
-  files       364 scanned, 58 parsed
+  files       364 scanned, 59 parsed
   nodes       27
   edges       23
   connected   5 of 22 components
@@ -27,7 +27,6 @@ podinfo
   diagnostics
     info helm_values_inferred          2
     info kustomize_unrendered          8
-    info unsupported_format            1
     warn ambiguous_reference           2
     warn helm_unrendered               1
     warn undeclared_projects           2
