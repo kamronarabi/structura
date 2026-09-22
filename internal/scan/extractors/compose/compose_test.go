@@ -45,9 +45,16 @@ func (c *capture) names() []string {
 	return out
 }
 
+// named matches an identifier by the component it names, whether or not it
+// carries a scope.
+func named(id, name string) bool {
+	parsed, err := schema.ParseNodeID(id)
+	return err == nil && parsed.Name == name
+}
+
 func (c *capture) hasEdge(from, to string, kind schema.EdgeKind) bool {
 	for _, e := range c.edges {
-		if strings.HasSuffix(e.From, "/"+from) && strings.HasSuffix(e.To, "/"+to) && e.Kind == kind {
+		if named(e.From, from) && named(e.To, to) && e.Kind == kind {
 			return true
 		}
 	}
@@ -57,7 +64,7 @@ func (c *capture) hasEdge(from, to string, kind schema.EdgeKind) bool {
 func (c *capture) hintsFor(service string) []resolve.Hint {
 	var out []resolve.Hint
 	for _, h := range c.hints {
-		if strings.HasSuffix(h.FromNode, "/"+service) {
+		if named(h.FromNode, service) {
 			out = append(out, h)
 		}
 	}
@@ -377,14 +384,20 @@ services:
 	}
 }
 
+// The project name names the boundary and nothing else. It is how the stack
+// is packaged, not where it is deployed, so a service keeps the identity it
+// would have had under any other packaging.
 func TestProjectNameFallsBackToTheDirectory(t *testing.T) {
 	c := extract(t, "services/checkout/docker-compose.yml", `
 services:
   api: {image: acme/api}
 `)
-	api := c.node(t, "api")
-	if api.Namespace != "checkout" {
-		t.Errorf("namespace = %q, want the directory name when no project name is declared", api.Namespace)
+	boundary := c.node(t, "checkout")
+	if boundary.Kind != schema.KindBoundary {
+		t.Fatalf("node %q is a %s, want the project boundary", boundary.Name, boundary.Kind)
+	}
+	if api := c.node(t, "api"); api.Namespace != "" {
+		t.Errorf("namespace = %q, want none: a Compose project is not a deployment scope", api.Namespace)
 	}
 }
 

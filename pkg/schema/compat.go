@@ -50,6 +50,14 @@ import (
 // became a field, Node.Namespace narrowed to a deployment scope, and
 // QualifyNamespace became QualifyProject. See ids.go.
 //
+// Narrowing Namespace also meant the extractors that had been writing
+// packaging into it -- a Compose project, a chart name, a Terraform module
+// root -- stopped. A chart is how a system is packaged, not where it is
+// deployed; the name identifies the boundary and nothing inside it. That is
+// not a further grammar change, which is why it is recorded here rather than
+// given a version of its own: the same fields mean the same things, and a
+// reader that parses one parses the other.
+//
 // It was done before 1.0 rather than after because the policy below gives 0.x
 // no free pass, so the cost was the same either way -- and once graph.json is
 // committed in repositories and read by many CLI versions at once, the cost is

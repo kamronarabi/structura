@@ -1,49 +1,53 @@
 awesome-compose
   files       493 scanned, 95 parsed
-  nodes       119
-  edges       114
-  connected   56 of 81 components
-  clusters    39
-  redundant   54 of 119 nodes
+  nodes       94
+  edges       99
+  connected   22 of 56 components
+  clusters    36
+  redundant   21 of 94 nodes
 
   nodes by kind
     boundary                           38
-    cloud_resource                     6
-    datastore                          20
+    cloud_resource                     3
+    datastore                          5
     queue                              1
-    service                            54
+    service                            47
 
   nodes by layer
-    container                          81
+    container                          56
     context                            38
 
   edges by kind
-    calls                              2
+    calls                              1
     contains                           80
-    depends_on                         21
-    persists_to                        10
+    depends_on                         10
+    persists_to                        7
     publishes_to                       1
 
   edges by rule
-    compose_depends_on                 26
+    compose_depends_on                 12
     compose_project_member             80
-    name_exact                         13
+    name_exact                         9
 
   components drawn more than once
-    backend                            14
-    db                                 16
-    frontend                           7
+    apache-php                         2
+    app                                2
+    backend                            8
+    flask                              2
+    flask-redis                        2
+    frontend                           4
     minecraft                          2
-    mongo                              2
-    nc                                 2
     portainer                          2
-    proxy                              5
-    redis                              3
+    proxy                              2
     sparkjava                          2
-    web                                9
+    vuejs                              2
+    web                                2
     wireguard                          2
 
   diagnostics
     info env_placeholder_reference     1
+    info node_kind_conflict            7
     info unresolved_reference          1
+    warn ambiguous_reference           1
     warn compose_parse_failed          1
+    warn undeclared_projects           6

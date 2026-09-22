@@ -1,17 +1,16 @@
 {
   "schemaVersion": "1.0.0",
   "generatedAt": "0001-01-01T00:00:00Z",
-  "contentHash": "sha256:19fa1e9e18d715b72f5cf977b4d78b5803cbf828cb92ff1f081e53a0ae712f86",
+  "contentHash": "sha256:a7b2964c4938211d3307e79e8fd3ccfab0ce879eb8415fc5c0cdac59387e3d88",
   "root": {
     "name": "helm-umbrella"
   },
   "nodes": [
     {
-      "id": "container:@shop/cart-api",
+      "id": "container:cart-api",
       "kind": "service",
       "layer": "container",
       "name": "cart-api",
-      "namespace": "shop",
       "tech": {
         "runtime": "kubernetes"
       },
@@ -33,11 +32,10 @@
       "confidence": 0.4
     },
     {
-      "id": "container:@shop/jaeger",
+      "id": "container:jaeger",
       "kind": "service",
       "layer": "container",
       "name": "jaeger",
-      "namespace": "shop",
       "tech": {
         "runtime": "kubernetes",
         "framework": "jaeger"
@@ -60,11 +58,10 @@
       "confidence": 0.4
     },
     {
-      "id": "container:@shop/shop-cache",
+      "id": "container:shop-cache",
       "kind": "datastore",
       "layer": "container",
       "name": "shop-cache",
-      "namespace": "shop",
       "tech": {
         "runtime": "kubernetes",
         "framework": "redis"
@@ -87,11 +84,10 @@
       "confidence": 0.4
     },
     {
-      "id": "container:@shop/storefront",
+      "id": "container:storefront",
       "kind": "service",
       "layer": "container",
       "name": "storefront",
-      "namespace": "shop",
       "tech": {
         "runtime": "kubernetes"
       },
@@ -113,11 +109,10 @@
       "confidence": 0.4
     },
     {
-      "id": "context:@shop/shop",
+      "id": "context:shop",
       "kind": "boundary",
       "layer": "context",
       "name": "shop",
-      "namespace": "shop",
       "attrs": {
         "appVersion": "2.1.0",
         "chartVersion": "1.4.0",
@@ -135,9 +130,9 @@
   ],
   "edges": [
     {
-      "id": "e:f3e778e6217a",
-      "from": "container:@shop/storefront",
-      "to": "container:@shop/cart-api",
+      "id": "e:d2cdaf5642d7",
+      "from": "container:storefront",
+      "to": "container:cart-api",
       "kind": "calls",
       "protocol": "http",
       "confidence": 0.8,
@@ -152,9 +147,9 @@
       ]
     },
     {
-      "id": "e:f51ee4c63c7c",
-      "from": "container:@shop/storefront",
-      "to": "container:@shop/shop-cache",
+      "id": "e:211664ed0efd",
+      "from": "container:storefront",
+      "to": "container:shop-cache",
       "kind": "persists_to",
       "protocol": "redis",
       "confidence": 0.8,
@@ -187,7 +182,7 @@
       "code": "unresolved_reference",
       "path": "charts/shop/values.yaml",
       "line": 33,
-      "message": "\"cart-api.shop\" refers to \"orders-db\", which matches no component in this repository"
+      "message": "\"cart-api\" refers to \"orders-db\", which matches no component in this repository"
     }
   ],
   "stats": {

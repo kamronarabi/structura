@@ -89,8 +89,12 @@ func (e *Extractor) Extract(ctx context.Context, f *scan.File, emit scan.Emitter
 	projectName := projectName(project, f)
 
 	// The project itself is a boundary, which is what gives the context-level
-	// view something to group services under.
-	boundaryID := schema.NewNodeID(schema.KindBoundary, projectName, projectName)
+	// view something to group services under. The project name belongs here,
+	// on the boundary, and not in the identifier of every service inside it:
+	// a Compose project is how a stack is packaged, not where it is deployed,
+	// and putting it in the scope segment gave the same service described by
+	// a Compose file and by a manifest two identifiers.
+	boundaryID := schema.NewNodeID(schema.KindBoundary, "", projectName)
 	emit.Node(schema.Node{
 		ID:         boundaryID,
 		Kind:       schema.KindBoundary,
@@ -111,7 +115,7 @@ func (e *Extractor) Extract(ctx context.Context, f *scan.File, emit scan.Emitter
 
 	ids := make(map[string]string, len(names))
 	for _, name := range names {
-		ids[name] = nodeID(projectName, name, project.Services[name].Image)
+		ids[name] = nodeID(name, project.Services[name].Image)
 	}
 
 	for _, name := range names {
@@ -172,7 +176,6 @@ func (e *Extractor) emitService(
 		Kind:       kind,
 		Layer:      schema.LayerContainer,
 		Name:       name,
-		Namespace:  projectName,
 		Tech:       techFor(tech),
 		Attrs:      attrs,
 		Sources:    []schema.Source{src},
@@ -335,9 +338,9 @@ func defaultProjectName(f *scan.File) string {
 	return path.Base(f.Dir)
 }
 
-func nodeID(projectName, serviceName, image string) string {
+func nodeID(serviceName, image string) string {
 	kind, _, _ := classify.ImageKind(image)
-	return schema.NewNodeID(kind, projectName, serviceName)
+	return schema.NewNodeID(kind, "", serviceName)
 }
 
 // repoRelativeBuildContext resolves a Compose build context against the

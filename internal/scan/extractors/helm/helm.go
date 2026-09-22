@@ -92,14 +92,18 @@ func (e *Extractor) extractChart(f *scan.File, emit scan.Emitter) error {
 	line := pos.Line("name")
 	src := schema.Source{Extractor: Name, Path: f.Path, Line: line}
 
-	boundaryID := schema.NewNodeID(schema.KindBoundary, chart.Name, chart.Name)
+	// The chart name identifies the boundary, and nothing inside it. A chart
+	// is how a system is packaged, not where it is deployed, and keeping it
+	// in the scope segment of every workload gave the chart's adservice and
+	// the manifest's adservice two identifiers.
+	boundaryID := schema.NewNodeID(schema.KindBoundary, "", chart.Name)
 	attrs := schema.Attrs{"chartVersion": chart.Version, "packaging": "helm"}
 	if chart.AppVersion != "" {
 		attrs["appVersion"] = chart.AppVersion
 	}
 	emit.Node(schema.Node{
 		ID: boundaryID, Kind: schema.KindBoundary, Layer: schema.LayerContext,
-		Name: chart.Name, Namespace: chart.Name,
+		Name:  chart.Name,
 		Attrs: attrs, Sources: []schema.Source{src},
 		Confidence: schema.ConfDeclared,
 	})
@@ -116,7 +120,7 @@ func (e *Extractor) extractChart(f *scan.File, emit scan.Emitter) error {
 		// postgresql subchart deploys Postgres — which is the same signal an
 		// image reference carries.
 		kind, tech, _ := classify.ImageKind(dep.Name)
-		depID := schema.NewNodeID(kind, chart.Name, name)
+		depID := schema.NewNodeID(kind, "", name)
 
 		depAttrs := schema.Attrs{"chart": dep.Name, "packaging": "helm-subchart"}
 		if dep.Version != "" {
@@ -134,7 +138,7 @@ func (e *Extractor) extractChart(f *scan.File, emit scan.Emitter) error {
 
 		emit.Node(schema.Node{
 			ID: depID, Kind: kind, Layer: schema.LayerContainer,
-			Name: name, Namespace: chart.Name,
+			Name:    name,
 			Tech:    &schema.Tech{Runtime: "kubernetes", Framework: tech},
 			Attrs:   depAttrs,
 			Sources: []schema.Source{src},
@@ -154,7 +158,7 @@ func (e *Extractor) extractChart(f *scan.File, emit scan.Emitter) error {
 		// The subchart's release name is how the parent's templates address
 		// it, and is what connection strings in values.yaml point at.
 		emit.Alias(resolve.Alias{
-			Name: chart.Name + "-" + name, Namespace: chart.Name,
+			Name:       chart.Name + "-" + name,
 			DNS:        []string{chart.Name + "-" + name, name},
 			TargetName: name,
 			Source: schema.Evidence{
@@ -190,7 +194,7 @@ func (e *Extractor) extractValues(f *scan.File, emit scan.Emitter) error {
 	// looksLikeChartValues tests for the single-service keys, so a chart
 	// deploying twelve services produced no components at all.
 	if workloads := umbrellaWorkloads(values); len(workloads) > 0 {
-		e.emitUmbrella(f, emit, chartName, workloads, pos)
+		e.emitUmbrella(f, emit, workloads, pos)
 		return nil
 	}
 
@@ -204,7 +208,7 @@ func (e *Extractor) extractValues(f *scan.File, emit scan.Emitter) error {
 
 	image := chartImage(values)
 	kind, tech, _ := classify.ImageKind(image)
-	id := schema.NewNodeID(kind, chartName, chartName)
+	id := schema.NewNodeID(kind, "", chartName)
 
 	attrs := schema.Attrs{"packaging": "helm"}
 	if image != "" {
@@ -219,7 +223,7 @@ func (e *Extractor) extractValues(f *scan.File, emit scan.Emitter) error {
 
 	emit.Node(schema.Node{
 		ID: id, Kind: kind, Layer: schema.LayerContainer,
-		Name: chartName, Namespace: chartName,
+		Name:  chartName,
 		Tech:  &schema.Tech{Runtime: "kubernetes", Framework: tech},
 		Attrs: attrs, Sources: []schema.Source{src},
 		// This node was inferred from a chart's default values, not read
@@ -463,7 +467,7 @@ func isDeployable(body map[string]any) bool {
 
 // emitUmbrella emits one component per workload, and attributes each
 // reference to the workload whose block holds it.
-func (e *Extractor) emitUmbrella(f *scan.File, emit scan.Emitter, chartName string, workloads []workload, pos *yamlpos.Locator) {
+func (e *Extractor) emitUmbrella(f *scan.File, emit scan.Emitter, workloads []workload, pos *yamlpos.Locator) {
 	ids := make(map[string]string, len(workloads))
 
 	for _, w := range workloads {
@@ -475,7 +479,7 @@ func (e *Extractor) emitUmbrella(f *scan.File, emit scan.Emitter, chartName stri
 		if !ok {
 			kind, tech, _ = classify.ImageKind(w.name)
 		}
-		id := schema.NewNodeID(kind, chartName, w.name)
+		id := schema.NewNodeID(kind, "", w.name)
 		ids[w.block] = id
 
 		attrs := schema.Attrs{"packaging": "helm", "valuesKey": w.block}
@@ -494,7 +498,7 @@ func (e *Extractor) emitUmbrella(f *scan.File, emit scan.Emitter, chartName stri
 
 		emit.Node(schema.Node{
 			ID: id, Kind: kind, Layer: schema.LayerContainer,
-			Name: w.name, Namespace: chartName,
+			Name:  w.name,
 			Tech:  &schema.Tech{Runtime: "kubernetes", Framework: tech},
 			Attrs: attrs,
 			Sources: []schema.Source{{
