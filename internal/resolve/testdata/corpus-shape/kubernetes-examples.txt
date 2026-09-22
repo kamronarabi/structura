@@ -37,3 +37,4 @@ kubernetes-examples
     info unmatched_service_selector    12
     info unresolved_reference          6
     warn k8s_parse_failed              10
+    warn undeclared_projects           1

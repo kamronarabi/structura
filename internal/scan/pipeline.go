@@ -141,6 +141,10 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 	var (
 		hints   []resolve.Hint
 		aliases []resolve.Alias
+		// Every reading, kept apart from the merged set: two accounts of one
+		// identifier are what the undeclared-project check looks for, and
+		// merging is what destroys the difference between them.
+		readings []schema.Node
 	)
 	parsed := 0
 	for _, out := range outputs {
@@ -149,6 +153,7 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 		}
 		for _, n := range out.Nodes {
 			merge.AddNode(n)
+			readings = append(readings, n)
 		}
 		diags = append(diags, out.Diagnostics...)
 		hints = append(hints, out.Hints...)
@@ -170,10 +175,10 @@ func Run(ctx context.Context, reg *Registry, opts Options) (Result, error) {
 		declaredEdges = append(declaredEdges, out.Edges...)
 	}
 
-	// Asked of the merged set rather than the resolved one: what this looks
-	// for is two files that produced the same identifier, and resolution
-	// deliberately merges nodes that did not.
-	diags = append(diags, undeclaredProjectDiagnostics(mergedNodes, projects)...)
+	// Asked of the readings rather than of the resolved graph: what this
+	// looks for is two files that produced the same identifier, and
+	// resolution deliberately merges nodes that did not.
+	diags = append(diags, undeclaredProjectDiagnostics(readings, projects)...)
 
 	// RESOLVE: match unresolved references against the finished node set.
 	resolved := resolve.Resolve(resolve.Input{
@@ -543,20 +548,40 @@ func rootDigest(root string) string {
 // may have merged two systems", and it exists because the alternative -- a
 // silently merged graph and a person who never learns the configuration key
 // exists -- is how the collision went unnoticed in the first place.
-func undeclaredProjectDiagnostics(nodes []schema.Node, set *project.Set) []schema.Diagnostic {
-	suspects := project.Suspects(nodes, set)
+func undeclaredProjectDiagnostics(readings []schema.Node, set *project.Set) []schema.Diagnostic {
+	suspects := project.Suspects(readings, set)
 	out := make([]schema.Diagnostic, 0, len(suspects))
 	for _, s := range suspects {
 		out = append(out, schema.Diagnostic{
 			Severity: schema.SeverityWarn,
 			Code:     "undeclared_projects",
 			Message: fmt.Sprintf(
-				"%s and %s both declare %s, and share no other component, which is what two "+
-					"independent projects look like. Their components are currently merged as "+
+				"%s declare %s, and %s. Their components are currently merged as "+
 					"though they were one system. If they are separate, list them under "+
 					"\"projects:\" in .structura.yaml; if they are one, nothing needs doing",
-				s.Trees[0], s.Trees[1], list(s.Shared)),
+				trees(s.Trees), list(s.Shared), because(s.Ground)),
 		})
 	}
 	return out
+}
+
+// trees names the directories in question. Two is the common case and reads
+// as a sentence; a repository of sample stacks produces a dozen and reads as
+// a list, so the two are spelled differently.
+func trees(dirs []string) string {
+	if len(dirs) == 2 {
+		return dirs[0] + " and " + dirs[1] + " both"
+	}
+	return list(dirs) + " all"
+}
+
+// because turns the grounds for suspicion into the clause that says why,
+// because the two grounds are different observations and one sentence
+// covering both would describe neither.
+func because(g project.Ground) string {
+	if g == project.GroundDescribedDifferently {
+		return "describe it differently -- a different image, or built from a " +
+			"different directory -- which is what two components sharing a name look like"
+	}
+	return "share no other component, which is what two independent projects look like"
 }
